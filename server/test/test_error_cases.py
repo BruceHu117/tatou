@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 from collections import namedtuple 
 from sqlalchemy.exc import DBAPIError # 确保已导入
 from server.src import watermarking_utils as WMUtils # 确保已导入
-
+from server.src.server import get_engine # 确保已导入 get_engine 函数
 
 # 导入 SQLAlchemy 异常 (如果需要 Mock 失败)
 from sqlalchemy.exc import IntegrityError, DBAPIError 
@@ -403,36 +403,7 @@ def test_create_watermark_db_insert_error(client, mocker, logged_in_client):
     🎯 目标覆盖：server.py L600-601 (Versions 插入的通用 except 分支)
     """
     headers = logged_in_client
-
-    # 1. 准备一个可上传的 PDF (依赖 upload-document 成功)
-    pdf_bytes = b"%PDF-1.4 test"
-    # r = client.post(
-    #     "/api/upload-document",
-    #     data={"file": (io.BytesIO(pdf_bytes), "db_fail.pdf")},
-    #     headers=headers,
-    #     content_type="multipart/form-data",
-    # )
-    # assert r.status_code == 201
-    # docid = r.get_json()["id"]
-
-    # # 2. Mock WMUtils 成功 (避免跳过 DB 步骤)
-    # mocker.patch.object(WMUtils, 'apply_watermark', return_value=b'watermarked_bytes')
-    # mocker.patch.object(WMUtils, 'is_watermarking_applicable', return_value=True)
-    
-    # # 3. Mock 数据库，使其在事务中抛出 DBAPIError
-    # mock_engine = MagicMock()
-    # mock_conn = mock_engine.begin.return_value.__enter__.return_value
-    # # 让 execute 在插入 Versions 时抛出异常
-    # mock_conn.execute.side_effect = DBAPIError("Test DB insert failed", {}, {})
-    # mocker.patch('server.src.server.get_engine', return_value=mock_engine)
-    
-
-# 假设 upload-document 成功 (您可能需要运行一个真实的上传来获取 docid)
-    # 为了简化测试，我们只 Mock DB 返回一个 DocID
-    mock_doc_row = MagicMock(id=1, name="pdf.pdf", path="/mock/path/doc.pdf")
-    mocker.patch('server.src.server.get_engine.return_value.connect.return_value.__enter__.return_value.execute.return_value.first', 
-                 return_value=mock_doc_row)
-    
+    # 1. Mock 必要的依赖，避免运行实际的上传/文件系统操作
     docid = 1 
     
     # ------------------------------------------------------------------
@@ -440,25 +411,33 @@ def test_create_watermark_db_insert_error(client, mocker, logged_in_client):
     # ------------------------------------------------------------------
     # 1.1 确保文件存在，跳过 410 检查 (L451)
     mocker.patch('pathlib.Path.exists', return_value=True) 
-    
     # 1.2 确保水印输入文件可以读取 (L454)
-    mocker.patch('pathlib.Path.read_bytes', return_value=pdf_bytes)
-    
+    mocker.patch('pathlib.Path.read_bytes', return_value=b'%PDF-1.4 test')
     # 1.3 确保水印成功 (L460)
     mocker.patch.object(WMUtils, 'apply_watermark', return_value=b'watermarked_bytes')
     mocker.patch.object(WMUtils, 'is_watermarking_applicable', return_value=True)
-    
     # 1.4 确保水文件写入成功 (L468)
     mocker.patch('pathlib.Path.write_bytes', return_value=None)
     
     # ------------------------------------------------------------------
-    # 关键修复 2: Mock 数据库，使其在事务中抛出 DBAPIError (L598)
+    # 关键修复 2: 正确 Mock 数据库 get_engine 函数，并配置其行为
     # ------------------------------------------------------------------
-    mock_engine = MagicMock()
-    mock_conn = mock_engine.begin.return_value.__enter__.return_value
     
-    # 让 execute 在插入 Versions 时抛出异常
+    # 创建一个 Mock Engine 实例
+    mock_engine = MagicMock() 
+    
+    # 模拟事务连接对象
+    mock_conn = mock_engine.begin.return_value.__enter__.return_value 
+    
+    # 让 execute 在插入 Versions 时抛出异常，触发 L600-601
     mock_conn.execute.side_effect = DBAPIError("Test DB insert failed", {}, {})
+    
+    # 模拟 Documents 查询成功，返回 doc_id=1 的文档（用于通过 L443 检查）
+    mock_conn.execute.return_value.first.return_value = MagicMock(
+        id=docid, name="pdf.pdf", path="/mock/path/doc.pdf"
+    )
+    
+    # Mock get_engine 函数，使其返回我们配置好的 mock_engine 实例
     mocker.patch('server.src.server.get_engine', return_value=mock_engine)
 
 
