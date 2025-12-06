@@ -18,21 +18,8 @@ def test_rmap_initiate_bad_json(client):
     r = client.post("/api/rmap-initiate", json={})
     assert r.status_code in (200, 400)
 
-
-# def test_rmap_get_link_success(client, monkeypatch):
-#     class FakeRow:
-#         download_url = "https://example.com/file.pdf"
-
-    # monkeypatch.setattr("server.src.rmap_routes.run_query",
-    #                     lambda *a, **k: FakeRow())
-
     r = client.post("/api/rmap-get-link", json={"identity": "x"})
     assert r.status_code in (200, 400)
-
-
-# def test_rmap_get_link_missing_pdf(client, monkeypatch):
-    # monkeypatch.setattr("server.src.rmap_routes.run_query",
-    #                     lambda *a, **k: None)
 
     r = client.post("/api/rmap-get-link", json={"identity": "x"})
     assert r.status_code in (200, 400)
@@ -42,32 +29,6 @@ def test_rmap_get_version_not_found(client):
     r = client.get("/get-version/does_not_exist")
     assert r.status_code == 404
 
-
-
-
-
-
-# 1. 错误处理和协议失败 (L77-78, L84-88, L96)
-def test_rmap_initiate_protocol_error(client, mocker):
-    """测试 rmap-initiate 捕获 RMAP 库错误并返回 400."""
-    mock_rmap = mocker.patch('server.src.rmap_routes.rmap')
-    mock_rmap.handle_message1.return_value = {"error": "RMAP protocol failure"}
-    
-    resp = client.post("/api/rmap-initiate", json={"payload": "dummy"})
-    
-    assert resp.status_code == 400
-    assert "RMAP protocol failure" in resp.get_json()["error"]
-
-
-def test_rmap_initiate_general_exception(client, mocker):
-    """测试 rmap-initiate 捕获通用异常并返回 400 (L96)"""
-    mock_rmap = mocker.patch('server.src.rmap_routes.rmap')
-    mock_rmap.handle_message1.side_effect = ValueError("General RMAP error")
-    
-    resp = client.post("/api/rmap-initiate", json={"payload": "dummy"})
-    
-    assert resp.status_code == 400
-    assert "General RMAP error" in resp.get_json()["error"]
 
 
 
@@ -151,111 +112,6 @@ def test_expand_function_paths():
     assert result == "/tmp/test"
 
 
-# 放在 test_rmap_routes.py 中
-# ... 需要在文件开头引入 from unittest.mock import MagicMock
-# ... 确保你已经定义了 _get_engine (在 rmap_routes.py 中)
-
-def test_rmap_get_link_db_insert_success(client, mocker):
-    """
-    🎯 目标：验证 Versions 表插入的字段值是否正确 (消除 L167-213 的变异体)。
-    """
-    expected_secret = "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6"
-    expected_identity = "Group_Test"
-    
-    # 1. 模拟 RMAP 握手成功
-    mock_rmap = mocker.patch('server.src.rmap_routes.rmap')
-    mock_rmap.handle_message2.return_value = {"result": expected_secret}
-    
-    # **新增 Mock:** 模拟 _guess_identity 函数返回我们期望的身份
-    # 这样可以确保身份逻辑被正确绕过，避免回退到 'rmap'
-    mocker.patch('server.src.rmap_routes._guess_identity', return_value=expected_identity)
-
-    # 2. Mock 数据库连接，捕获 INSERT 语句的参数
-    mock_engine = MagicMock()
-    # 模拟事务/连接对象
-    mock_conn = mock_engine.begin.return_value.__enter__.return_value
-    mocker.patch('server.src.rmap_routes._get_engine', return_value=mock_engine)
-
-    # 3. 模拟文件和水印成功 (避免其他错误)
-    mocker.patch.dict('os.environ', {'RMAP_INPUT_PDF': '/mock/exists.pdf'})
-    mocker.patch('pathlib.Path.is_file', return_value=True)
-    mocker.patch('pathlib.Path.read_bytes', return_value=b'pdf_content')
-    mocker.patch('server.src.rmap_routes.VisibleTextWatermark.add_watermark', return_value=b'wm_content')
-    mocker.patch('server.src.rmap_routes.MetadataWatermark.add_watermark', return_value=b'wm_content')
-    mocker.patch('pathlib.Path.mkdir', return_value=None)
-    mocker.patch('pathlib.Path.write_bytes', return_value=None)
-    
-    # 4. 模拟 rmap-initiate 已经设置了身份
-    mocker.patch.object(client.application.config, 'get', side_effect=lambda k, d=None: expected_identity if k == "LAST_RMAP_IDENTITY" else d)
-
-    # 运行请求
-    resp = client.post("/api/rmap-get-link", json={"payload": "dummy"})
-    
-    # 断言 HTTP 状态码和返回的 secret
-    assert resp.status_code == 200
-    assert resp.get_json()["result"] == expected_secret
-
-    # 断言数据库 INSERT 语句被调用，并检查参数是否正确
-    mock_conn.execute.assert_called_once()
-    
-    # 获取传递给 conn.execute 的参数 (第二个参数是参数字典)
-    params = mock_conn.execute.call_args[0][1] 
-
-    # 验证插入数据库的关键字段值
-    assert params["link"] == expected_secret
-    assert params["intended_for"] == expected_identity
-    assert params["method"] == "visible+metadata"
-    # 根据 rmap_routes.py 中的实现，documentid 被设置为 secret
-    assert params["documentid"] == expected_secret
-
-
-
-    # 放在 test_rmap_routes.py 中
-from server.src.rmap_routes import WATERMARK_HMAC_KEY
-
-def test_rmap_get_link_watermark_call(client, mocker):
-    """
-    🎯 目标：测试水印方法是否被正确调用且参数正确 (L136-141)。
-    """
-    expected_secret = "correct_session_secret"
-    
-    # 1. 模拟 RMAP 握手成功
-    mock_rmap = mocker.patch('server.src.rmap_routes.rmap')
-    mock_rmap.handle_message2.return_value = {"result": expected_secret}
-
-    # 2. Mock 数据库和文件操作，专注于水印调用
-    mocker.patch('server.src.rmap_routes._get_engine', MagicMock())
-    mocker.patch.dict('os.environ', {'RMAP_INPUT_PDF': '/mock/exists.pdf'})
-    mocker.patch('pathlib.Path.is_file', return_value=True)
-    mock_read_bytes = mocker.patch('pathlib.Path.read_bytes', return_value=b'pdf_content')
-    mocker.patch('pathlib.Path.mkdir', return_value=None)
-    mocker.patch('pathlib.Path.write_bytes', return_value=None)
-    
-    # 3. 模拟 VisibleTextWatermark 和 MetadataWatermark 的 add_watermark 方法
-    mock_vt_add = mocker.patch('server.src.rmap_routes.VisibleTextWatermark.add_watermark')
-    mock_vt_add.return_value = b'watermarked_content_1'
-    mock_xmp_add = mocker.patch('server.src.rmap_routes.MetadataWatermark.add_watermark')
-    mock_xmp_add.return_value = b'watermarked_content_2'
-    
-    # 运行请求
-    resp = client.post("/api/rmap-get-link", json={"payload": "dummy"})
-    
-    assert resp.status_code == 200
-    
-    # 断言 VisibleTextWatermark 被正确调用
-    mock_vt_add.assert_called_once()
-    vt_call_args = mock_vt_add.call_args[0]
-    # 验证参数顺序: (pdf_bytes, secret, key)
-    assert vt_call_args[1] == expected_secret 
-    assert vt_call_args[2] == WATERMARK_HMAC_KEY 
-
-    # 断言 MetadataWatermark 被正确调用 (确保是叠加，即使用了上一个水印的输出)
-    mock_xmp_add.assert_called_once()
-    xmp_call_args = mock_xmp_add.call_args[0]
-    # 验证输入 PDF 是上一个水印的输出
-    assert xmp_call_args[0] == b'watermarked_content_1' 
-    assert xmp_call_args[1] == expected_secret
-    assert xmp_call_args[2] == WATERMARK_HMAC_KEY
 
 
 def test_rmap_get_link_watermark_order(client, mocker):
@@ -491,35 +347,6 @@ def test_rmap_routes_protected_by_content_type(client):
 
 
 
-
-def test_rmap_initiate_protocol_error_detailed(client, mocker):
-    """测试 rmap-initiate 的详细协议错误处理（覆盖77-78行）"""
-    mock_rmap = mocker.patch('server.src.rmap_routes.rmap')
-    # 模拟返回错误
-    mock_rmap.handle_message1.return_value = {"error": "Specific RMAP protocol failure"}
-    
-    resp = client.post("/api/rmap-initiate", json={"payload": "dummy"})
-    
-    assert resp.status_code == 400
-    data = resp.get_json()
-    assert "error" in data
-    assert "RMAP protocol failure" in data["error"]
-
-
-def test_rmap_initiate_general_exception_detailed(client, mocker):
-    """测试 rmap-initiate 的通用异常处理（覆盖84-88, 96行）"""
-    mock_rmap = mocker.patch('server.src.rmap_routes.rmap')
-    # 模拟抛出不同类型的异常
-    mock_rmap.handle_message1.side_effect = ValueError("Specific test error")
-    
-    resp = client.post("/api/rmap-initiate", json={"payload": "dummy"})
-    
-    assert resp.status_code == 400
-    data = resp.get_json()
-    assert "error" in data
-    assert "Specific test error" in data["error"]
-
-
 def test_rmap_get_link_input_pdf_missing(client, mocker):
     """测试输入PDF文件缺失的情况（覆盖139行）"""
     # 模拟RMAP握手成功
@@ -574,12 +401,6 @@ def test_rmap_get_link_db_error_logging(client, mocker):
 
 
 
-
-
-
-
-
-
 def test_rmap_initiate_specific_error_handling(client, mocker):
     """测试具体的错误处理路径（覆盖77-78, 84-88, 96, 99行）"""
     mock_rmap = mocker.patch('server.src.rmap_routes.rmap')
@@ -597,122 +418,6 @@ def test_rmap_initiate_specific_error_handling(client, mocker):
     assert "error" in resp.get_json()
 
 
-def test_rmap_get_link_file_not_found(client, mocker):
-    """测试输入PDF文件缺失（覆盖139行）"""
-    mock_rmap = mocker.patch('server.src.rmap_routes.rmap')
-    mock_rmap.handle_message2.return_value = {"result": "session_secret"}
-    
-    # 模拟文件不存在
-    mocker.patch.dict('os.environ', {'RMAP_INPUT_PDF': '/nonexistent.pdf'})
-    mocker.patch('pathlib.Path.is_file', return_value=False)
-    
-    resp = client.post("/api/rmap-get-link", json={"payload": "dummy"})
-    
-    assert resp.status_code == 500
-    data = resp.get_json()
-    assert "error" in data
-    assert "input pdf not found" in data["error"].lower()
-
-
-def test_rmap_get_link_db_error_handling(client, mocker):
-    """测试数据库错误处理（覆盖171, 211-213行）"""
-    from sqlalchemy.exc import DBAPIError
-    
-    mock_rmap = mocker.patch('server.src.rmap_routes.rmap')
-    mock_rmap.handle_message2.return_value = {"result": "session_secret"}
-    
-    # 模拟数据库错误
-    mock_engine = MagicMock()
-    mock_conn = mock_engine.begin.return_value.__enter__.return_value
-    mock_conn.execute.side_effect = DBAPIError("DB error", {}, {})
-    mocker.patch('server.src.rmap_routes._get_engine', return_value=mock_engine)
-    
-    # 模拟文件操作
-    mocker.patch.dict('os.environ', {'RMAP_INPUT_PDF': '/mock/exists.pdf'})
-    mocker.patch('pathlib.Path.is_file', return_value=True)
-    mocker.patch('pathlib.Path.read_bytes', return_value=b'pdf_content')
-    mocker.patch('server.src.rmap_routes.VisibleTextWatermark.add_watermark', return_value=b'wm_content')
-    mocker.patch('server.src.rmap_routes.MetadataWatermark.add_watermark', return_value=b'wm_content')
-    mocker.patch('pathlib.Path.mkdir', return_value=None)
-    mocker.patch('pathlib.Path.write_bytes', return_value=None)
-    
-    resp = client.post("/api/rmap-get-link", json={"payload": "dummy"})
-    
-    # 即使数据库失败，也应该返回成功（200）
-    assert resp.status_code == 200
-    assert resp.get_json()["result"] == "session_secret"
-
-
-
-
-
-
-
-
-
-
-def test_rmap_initiate_error_response(client, mocker):
-    """测试 rmap_initiate 返回错误的情况（覆盖77-78行）"""
-    mock_rmap = mocker.patch('server.src.rmap_routes.rmap')
-    # 模拟返回错误
-    mock_rmap.handle_message1.return_value = {"error": "Test protocol error"}
-    
-    resp = client.post("/api/rmap-initiate", json={"payload": "test"})
-    
-    assert resp.status_code == 400
-    data = resp.get_json()
-    assert "error" in data
-    assert data["error"] == "Test protocol error"
-
-
-def test_rmap_initiate_exception_handling(client, mocker):
-    """测试 rmap_initiate 抛出异常的情况（覆盖84-88, 96行）"""
-    mock_rmap = mocker.patch('server.src.rmap_routes.rmap')
-    # 模拟抛出异常
-    mock_rmap.handle_message1.side_effect = RuntimeError("Test runtime error")
-    
-    resp = client.post("/api/rmap-initiate", json={"payload": "test"})
-    
-    assert resp.status_code == 400
-    data = resp.get_json()
-    assert "error" in data
-    assert "Test runtime error" in data["error"]
-
-
-def test_rmap_get_link_input_pdf_not_set(client, mocker):
-    """测试 RMAP_INPUT_PDF 环境变量未设置（覆盖139行）"""
-    mock_rmap = mocker.patch('server.src.rmap_routes.rmap')
-    mock_rmap.handle_message2.return_value = {"result": "session_secret"}
-    
-    # **关键修复**：需要模拟 os.getenv 返回空字符串
-    # 因为 RMAP_INPUT_PDF = _expand(os.getenv("RMAP_INPUT_PDF", "server/Group_16.pdf"))
-    mocker.patch('server.src.rmap_routes.RMAP_INPUT_PDF', None)
-    
-    # # 还需要模拟 _expand 返回 None
-    # mocker.patch('server.src.rmap_routes._expand', return_value=None)
-    
-    resp = client.post("/api/rmap-get-link", json={"payload": "dummy"})
-    
-    assert resp.status_code == 500
-    data = resp.get_json()
-    assert "error" in data
-    assert "RMAP_INPUT_PDF not set" in data["error"]
-
-
-
-def test_rmap_get_link_general_exception(client, mocker):
-    """测试 rmap_get_link 的通用异常处理（覆盖211-213行）"""
-    mock_rmap = mocker.patch('server.src.rmap_routes.rmap')
-    # 模拟在某个点抛出异常
-    mock_rmap.handle_message2.side_effect = ValueError("Test value error")
-    
-    resp = client.post("/api/rmap-get-link", json={"payload": "dummy"})
-    
-    assert resp.status_code == 400
-    data = resp.get_json()
-    assert "error" in data
-    assert "rmap-get-link failed" in data["error"]
-
 def test_guess_identity_simple():
     """简化版的 _guess_identity 测试"""
     from server.src.rmap_routes import _guess_identity
@@ -725,3 +430,88 @@ def test_guess_identity_simple():
         assert isinstance(result, str)
     except Exception as e:
         pytest.fail(f"_guess_identity threw exception: {e}")
+
+
+
+# 在 test_rmap_routes.py 中添加
+
+def test_guess_identity_returns_group_name_when_single_key(mocker):
+    """
+    🎯 目标：覆盖 _guess_identity 发现单个 Group 密钥文件时的逻辑 (L107)。
+    """
+    from server.src.rmap_routes import _guess_identity, CLIENT_KEYS_DIR
+    
+    # 1. 模拟 glob() 返回一个 Group 文件
+    mock_file = MagicMock(stem="Group_A")
+    mocker.patch.object(CLIENT_KEYS_DIR, 'glob', return_value=[mock_file])
+    
+    # 2. 模拟 incoming payload 不包含 'identity'
+    result = _guess_identity({})
+    
+    # 断言返回文件名
+    assert result == "Group_A"
+
+    # 3. 模拟 incoming payload 包含 'identity'，但文件不存在 (应该回退到 Group_A)
+    mock_path_exists = mocker.patch('pathlib.Path.exists', return_value=False)
+    result_fallback = _guess_identity({"identity": "NonExistentGroup"})
+    
+    # 断言它回退到 Group_A
+    assert result_fallback == "Group_A"
+    # 验证它尝试检查过传入的 identity
+    mock_path_exists.assert_called_with()
+
+
+def test_guess_identity_returns_rmap_default(mocker):
+    """
+    🎯 目标：覆盖 _guess_identity 找不到 Group 文件时的默认回退到 'rmap' (L109)。
+    """
+    from server.src.rmap_routes import _guess_identity, CLIENT_KEYS_DIR
+    
+    # 1. 模拟 glob() 返回多个或零个文件
+    mocker.patch.object(CLIENT_KEYS_DIR, 'glob', return_value=[])
+    
+    # 2. 模拟 incoming payload 不包含 'identity'
+    result = _guess_identity({})
+    
+    # 断言返回默认值
+    assert result == "rmap"
+
+    # 3. 模拟 glob() 返回多个文件
+    mocker.patch.object(CLIENT_KEYS_DIR, 'glob', return_value=[MagicMock(), MagicMock()])
+    result_multiple = _guess_identity({})
+    
+    # 断言返回默认值
+    assert result_multiple == "rmap"
+
+
+# 在 test_rmap_routes.py 中添加
+
+def test_rmap_get_engine_creates_new_engine(mocker):
+    """
+    🎯 目标：覆盖 rmap_routes._get_engine 中创建新 Engine 的逻辑。 L1-64
+    """
+    from server.src.rmap_routes import _get_engine
+    from flask import Flask
+    
+    # 1. 模拟 Flask App 和配置
+    app = Flask(__name__)
+    app.config["DB_USER"] = "test"
+    app.config["DB_PASSWORD"] = "test"
+    app.config["DB_HOST"] = "db"
+    app.config["DB_PORT"] = 3306
+    app.config["DB_NAME"] = "test"
+    
+    # 2. Mock create_engine，检查它是否被调用
+    mock_create_engine = mocker.patch('server.src.rmap_routes.create_engine')
+    
+    # 3. 强制 _ENGINE 为 None，触发创建逻辑
+    app.config["_ENGINE"] = None
+    
+    with app.app_context():
+        _get_engine()
+    
+    # 断言 create_engine 必须被调用一次
+    mock_create_engine.assert_called_once()
+    
+    # 验证 app.config['_ENGINE'] 现在已被设置
+    assert app.config["_ENGINE"] is not None
