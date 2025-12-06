@@ -537,3 +537,62 @@ def test_expand_function_paths():
     normal_path = "/tmp/test_normal"
     result = _expand(normal_path)
     assert result == "/tmp/test_normal"
+
+
+
+
+
+
+def test_require_file_function_exists_case(mocker):
+    """
+    测试 _require_file 在文件存在时应该通过。
+    🎯 目标：杀死 L39 翻转文件存在性检查的变异体 (Mutant 2)。
+    """
+    from server.src.rmap_routes import _require_file
+    import os
+    
+    # Mock os.path.isfile 来模拟文件存在
+    mocker.patch('os.path.isfile', return_value=True)
+    
+    try:
+        # 此时，_require_file 不应该抛出异常
+        _require_file("/path/to/existing/file", "TEST_LABEL")
+    except FileNotFoundError:
+        # 如果抛出异常，说明 Mutant 2 (if os.path.isfile(path):) 存活
+        pytest.fail("Mutant 2 is still alive: File existence check failed.")
+
+
+def test_require_file_function_missing_case(mocker):
+    """
+    测试 _require_file 在文件不存在时抛出 FileNotFoundError。
+    """
+    from server.src.rmap_routes import _require_file
+    
+    # Mock os.path.isfile 来模拟文件不存在
+    mocker.patch('os.path.isfile', return_value=False)
+    
+    with pytest.raises(FileNotFoundError) as excinfo:
+        _require_file("/path/to/missing/file", "TEST_LABEL")
+        
+    # 断言错误信息 (用于杀死修改字符串的变异体)
+    assert "TEST_LABEL not found at:" in str(excinfo.value)
+
+
+# 在 test_rmap_routes.py 中添加 (这假设 RMAP_KEYS_DIR 等变量在正常测试环境中是有效的)
+
+def test_rmap_module_constants_exist():
+    """
+    🎯 目标：检查 RMAP 模块级的常量对象是否正确初始化。
+    """
+    from server.src.rmap_routes import rmap, im, RMAP_KEYS_DIR
+    from rmap.identity_manager import IdentityManager
+    from rmap.rmap import RMAP
+
+    # 断言对象类型 (如果变异体删除了 RMAP_KEYS_DIR，则会失败)
+    assert isinstance(im, IdentityManager)
+    assert isinstance(rmap, RMAP)
+    assert isinstance(RMAP_KEYS_DIR, str)
+    
+    # 断言 IdentityManager 的初始化路径 (确保 L55-58 的调用正确)
+    # 这要求 RMAP_KEYS_DIR 路径必须是正确的，否则模块在加载时就会失败。
+    # 如果该测试失败，则表明模块常量初始化失败。
