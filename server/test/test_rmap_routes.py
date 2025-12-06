@@ -537,3 +537,25 @@ def test_expand_function_paths():
     normal_path = "/tmp/test_normal"
     result = _expand(normal_path)
     assert result == "/tmp/test_normal"
+
+
+
+
+# test_rmap_routes.py 中添加/修改
+
+def test_require_file_function_exists_case(mocker):
+    """
+    测试 _require_file 在文件存在时应该通过。
+    🎯 目标：杀死 Mutant 2 (翻转文件存在性检查)。
+    """
+    from server.src.rmap_routes import _require_file
+    
+    # Mock os.path.isfile 来模拟文件存在
+    mocker.patch('os.path.isfile', return_value=True)
+    
+    try:
+        # 此时，_require_file 不应该抛出异常。如果 Mutant 2 存活，这里会抛出异常。
+        _require_file("/path/to/existing/file", "TEST_LABEL")
+    except FileNotFoundError:
+        # 如果捕获到异常，说明变异体存活，应该让测试失败。
+        pytest.fail("Mutant 2 is still alive: File existence check failed.")
