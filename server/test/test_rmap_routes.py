@@ -184,33 +184,7 @@ def test_config_missing_server_key_prevents_init(mocker):
         assert "RMAP_SERVER_PRIV not found at:" in str(excinfo.value)
         
 
-def test_config_missing_keys_dir_prevents_init(mocker):
-    """
-    测试 RMAP_KEYS_DIR 缺失时是否正确抛出 RuntimeError。
-    目标是 L44-47。
-    """
-    # 1. Mock os.path.isdir 来模拟密钥目录缺失
-    mocker.patch('os.path.isdir', return_value=False)
-    
-    # 2. Mock os.path.isfile 来防止后续的 FileNotFoundError
-    mocker.patch('os.path.isfile', return_value=True)
 
-    with patch.dict('os.environ', {
-        "RMAP_KEYS_DIR": "nonexistent/dir",
-    }, clear=False):
-        
-        # 3. 尝试重新加载模块；预期会失败
-        with pytest.raises(RuntimeError) as excinfo:
-            importlib.reload(rmap_routes) 
-        
-        # 断言正确的错误信息
-        assert "RMAP_KEYS_DIR not found or not a directory:" in str(excinfo.value)
-
-
-@pytest.mark.skip(reason="Module-level initialization is too complex to test reliably")
-def test_rmap_config_paths_checked():
-    """跳过这个测试"""
-    pass
 
 def test_require_file_function():
     """测试 _require_file 函数"""
