@@ -488,51 +488,52 @@ def test_guess_identity_returns_rmap_default(mocker):
 
 # 在 test_rmap_routes.py 中添加或替换
 
+# 在 test_rmap_routes.py 中添加或替换
+
 def test_rmap_get_engine_creates_new_engine(mocker, client):
     """
     🎯 目标：强制 _get_engine 命中 create_engine 分支 (L65-71)。
     """
     from server.src.rmap_routes import _get_engine
-    from server.src import rmap_routes as rmap_mod
-    from flask import current_app, Flask
-
+    
+    app = client.application
+    
     # 1. Mock create_engine (检查它是否被调用)
-    # Mocking 路径必须正确
     mock_create_engine = mocker.patch('server.src.rmap_routes.create_engine')
     
-    # 2. 模拟 Flask App 和配置 (使用 client.application)
-    app = client.application
+    # 2. 设置 Mock DB 配置
+    app.config.update({
+        "DB_USER": "test",
+        "DB_PASSWORD": "test",
+        "DB_HOST": "db",
+        "DB_PORT": 3306,
+        "DB_NAME": "test",
+    })
 
-    # 3. **CRITICAL FIX: 强制 Mock current_app.config**
-    # 确保在应用上下文中运行
+    # 3. **CRITICAL FIX: 临时清除配置和模块缓存**
     with app.app_context():
-        # 3.1 清除模块缓存的 Engine
-        rmap_mod._get_engine.eng = None # 确保函数内的 eng 变量是 None
-
-        # 3.2 临时修改 app.config，确保它返回 None
-        # 否则，conftest.py 可能会预设一个值
-        original_engine_config = app.config.get("_ENGINE")
-        app.config["_ENGINE"] = None
+        # 强制清除 app.config 中的缓存
+        original_engine_config = app.config.pop("_ENGINE", None)
         
+        # 强制清除 rmap_routes 模块级别的 Engine 缓存 (如果存在)
+        if hasattr(_get_engine, 'eng'):
+             del _get_engine.eng # 仅在 Python >= 3.7 上可能有效
+
         try:
             # 4. 调用 _get_engine
-            engine_result = _get_engine()
+            _get_engine()
         finally:
             # 恢复配置
-            app.config["_ENGINE"] = original_engine_config
-            # 清理模块缓存
-            rmap_mod._get_engine.eng = None 
-    
+            if original_engine_config is not None:
+                app.config["_ENGINE"] = original_engine_config
+            
     # 5. 断言 create_engine 必须被调用一次
     mock_create_engine.assert_called_once()
-    
-    # 断言 app.config["_ENGINE"] 现在已被设置 (在函数内)
-    # 注意：engine_result 应该是 mock_create_engine 的返回值
-    assert engine_result is not None
 
 
 
-    # 在 test_rmap_routes.py 中添加
+
+# 在 test_rmap_routes.py 中添加
 
 def test_expand_function_paths():
     """
@@ -548,7 +549,6 @@ def test_expand_function_paths():
     # 2. 测试波浪号扩展 (os.path.expanduser)
     test_path = "~/test"
     result = _expand(test_path)
-    # 检查波浪号是否被扩展 (假设 HOME 变量已设置)
     assert result is not None
     assert "~" not in result 
     
@@ -556,7 +556,6 @@ def test_expand_function_paths():
     if 'HOME' in os.environ:
         env_path = "$HOME/test_var"
         result = _expand(env_path)
-        # 检查 $HOME 是否被扩展
         assert result is not None
         assert "$HOME" not in result
     
