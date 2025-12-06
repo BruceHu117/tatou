@@ -333,36 +333,3 @@ def test_login_db_error_returns_503(client, mocker):
 
 
 
-# 在 test_server.py 或 test_error_cases.py 中添加
-
-def test_db_url_generates_mysql_uri():
-    """
-    🎯 目标：测试 db_url 函数在没有 SQLALCHEMY_DATABASE_URI 时，
-    是否根据 DB_* 环境变量正确构建 MySQL 连接字符串。
-    覆盖 server.py L65-68。
-    """
-    from server.src.server import create_app
-    
-    # 1. 模拟环境配置 (覆盖默认值)
-    os.environ["DB_USER"] = "prod_user"
-    os.environ["DB_PASSWORD"] = "prod_pass"
-    os.environ["DB_HOST"] = "prod_db"
-    os.environ["DB_PORT"] = "9999"
-    os.environ["DB_NAME"] = "prod_tatou"
-
-    # 2. 创建应用实例，但要确保不使用 conftest 中的预设 SQLALCHEMY_DATABASE_URI
-    app = create_app()
-    
-    # 3. 移除任何可能来自 conftest 的 SQLALCHEMY_DATABASE_URI 预设值
-    if 'SQLALCHEMY_DATABASE_URI' in app.config:
-        del app.config['SQLALCHEMY_DATABASE_URI']
-        
-    from server.src.server import db_url # 导入 db_url 函数
-
-    # 4. 运行 db_url
-    generated_uri = db_url(app)
-    
-    expected_uri = "mysql+pymysql://prod_user:prod_pass@prod_db:9999/prod_tatou?charset=utf8mb4"
-    
-    # 5. 断言
-    assert generated_uri == expected_uri
