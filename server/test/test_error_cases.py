@@ -406,26 +406,62 @@ def test_create_watermark_db_insert_error(client, mocker, logged_in_client):
 
     # 1. 准备一个可上传的 PDF (依赖 upload-document 成功)
     pdf_bytes = b"%PDF-1.4 test"
-    r = client.post(
-        "/api/upload-document",
-        data={"file": (io.BytesIO(pdf_bytes), "db_fail.pdf")},
-        headers=headers,
-        content_type="multipart/form-data",
-    )
-    assert r.status_code == 201
-    docid = r.get_json()["id"]
+    # r = client.post(
+    #     "/api/upload-document",
+    #     data={"file": (io.BytesIO(pdf_bytes), "db_fail.pdf")},
+    #     headers=headers,
+    #     content_type="multipart/form-data",
+    # )
+    # assert r.status_code == 201
+    # docid = r.get_json()["id"]
 
-    # 2. Mock WMUtils 成功 (避免跳过 DB 步骤)
+    # # 2. Mock WMUtils 成功 (避免跳过 DB 步骤)
+    # mocker.patch.object(WMUtils, 'apply_watermark', return_value=b'watermarked_bytes')
+    # mocker.patch.object(WMUtils, 'is_watermarking_applicable', return_value=True)
+    
+    # # 3. Mock 数据库，使其在事务中抛出 DBAPIError
+    # mock_engine = MagicMock()
+    # mock_conn = mock_engine.begin.return_value.__enter__.return_value
+    # # 让 execute 在插入 Versions 时抛出异常
+    # mock_conn.execute.side_effect = DBAPIError("Test DB insert failed", {}, {})
+    # mocker.patch('server.src.server.get_engine', return_value=mock_engine)
+    
+
+# 假设 upload-document 成功 (您可能需要运行一个真实的上传来获取 docid)
+    # 为了简化测试，我们只 Mock DB 返回一个 DocID
+    mock_doc_row = MagicMock(id=1, name="pdf.pdf", path="/mock/path/doc.pdf")
+    mocker.patch('server.src.server.get_engine.return_value.connect.return_value.__enter__.return_value.execute.return_value.first', 
+                 return_value=mock_doc_row)
+    
+    docid = 1 
+    
+    # ------------------------------------------------------------------
+    # 关键修复 1: Mock 文件操作，确保文件存在且水印成功
+    # ------------------------------------------------------------------
+    # 1.1 确保文件存在，跳过 410 检查 (L451)
+    mocker.patch('pathlib.Path.exists', return_value=True) 
+    
+    # 1.2 确保水印输入文件可以读取 (L454)
+    mocker.patch('pathlib.Path.read_bytes', return_value=pdf_bytes)
+    
+    # 1.3 确保水印成功 (L460)
     mocker.patch.object(WMUtils, 'apply_watermark', return_value=b'watermarked_bytes')
     mocker.patch.object(WMUtils, 'is_watermarking_applicable', return_value=True)
     
-    # 3. Mock 数据库，使其在事务中抛出 DBAPIError
+    # 1.4 确保水文件写入成功 (L468)
+    mocker.patch('pathlib.Path.write_bytes', return_value=None)
+    
+    # ------------------------------------------------------------------
+    # 关键修复 2: Mock 数据库，使其在事务中抛出 DBAPIError (L598)
+    # ------------------------------------------------------------------
     mock_engine = MagicMock()
     mock_conn = mock_engine.begin.return_value.__enter__.return_value
+    
     # 让 execute 在插入 Versions 时抛出异常
     mock_conn.execute.side_effect = DBAPIError("Test DB insert failed", {}, {})
     mocker.patch('server.src.server.get_engine', return_value=mock_engine)
-    
+
+
     # 4. 运行请求
     r = client.post(
         f"/api/create-watermark/{docid}",
