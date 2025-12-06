@@ -8,6 +8,9 @@ import pytest
 from itsdangerous import SignatureExpired, BadSignature
 from unittest.mock import MagicMock
 from collections import namedtuple 
+from sqlalchemy.exc import DBAPIError # 确保已导入
+from server.src import watermarking_utils as WMUtils # 确保已导入
+
 
 # 导入 SQLAlchemy 异常 (如果需要 Mock 失败)
 from sqlalchemy.exc import IntegrityError, DBAPIError 
@@ -364,3 +367,77 @@ def test_delete_document_path_traversal_is_blocked(client, mocker, caplog): # <-
     resp_json = resp.get_json()
     assert resp_json["deleted"] is True
     assert resp_json["file_deleted"] is False
+
+
+    # --- 1. 修复文件大小校验 (L335-336 / Mutant ID 600) ---
+def test_upload_rejects_file_too_small(client, logged_in_client):
+    """
+    测试上传的文件小于 10 字节时返回 400。
+    🎯 目标覆盖：server.py L335-336 (文件太小检查)
+    """
+    headers = logged_in_client
+    
+    # PDF 文件头只有 9 字节，用于触发 total_size < 10 的条件。
+    small_pdf_content = b"%PDF-1.4\n" 
+    
+    r = client.post(
+        "/api/upload-document",
+        data={"file": (io.BytesIO(small_pdf_content), "small.pdf")},
+        headers=headers,
+        content_type="multipart/form-data",
+    )
+
+    # 预期命中 L335，返回 400 (并杀死 Mutant 600)
+    assert r.status_code == 400
+    assert "file too small to be a valid PDF" in r.get_json()["error"]
+
+
+
+
+# ... (logged_in_client fixture 和其他导入保持不变) ...
+
+# --- 2. 修复版本插入数据库错误 (L600-601) ---
+def test_create_watermark_db_insert_error(client, mocker, logged_in_client):
+    """
+    测试 create_watermark 在插入 Versions 表时遇到数据库错误 (非完整性错误)。
+    🎯 目标覆盖：server.py L600-601 (Versions 插入的通用 except 分支)
+    """
+    headers = logged_in_client
+
+    # 1. 准备一个可上传的 PDF (依赖 upload-document 成功)
+    pdf_bytes = b"%PDF-1.4 test"
+    r = client.post(
+        "/api/upload-document",
+        data={"file": (io.BytesIO(pdf_bytes), "db_fail.pdf")},
+        headers=headers,
+        content_type="multipart/form-data",
+    )
+    assert r.status_code == 201
+    docid = r.get_json()["id"]
+
+    # 2. Mock WMUtils 成功 (避免跳过 DB 步骤)
+    mocker.patch.object(WMUtils, 'apply_watermark', return_value=b'watermarked_bytes')
+    mocker.patch.object(WMUtils, 'is_watermarking_applicable', return_value=True)
+    
+    # 3. Mock 数据库，使其在事务中抛出 DBAPIError
+    mock_engine = MagicMock()
+    mock_conn = mock_engine.begin.return_value.__enter__.return_value
+    # 让 execute 在插入 Versions 时抛出异常
+    mock_conn.execute.side_effect = DBAPIError("Test DB insert failed", {}, {})
+    mocker.patch('server.src.server.get_engine', return_value=mock_engine)
+    
+    # 4. 运行请求
+    r = client.post(
+        f"/api/create-watermark/{docid}",
+        json={
+            "method": "trailer-hmac",
+            "key": "abc",
+            "secret": "s",
+            "intended_for": "test_user",
+        },
+        headers=headers,
+    )
+    
+    # 预期命中 L600 (except Exception as e: ...)，返回 503
+    assert r.status_code == 503
+    assert "database error during version insert" in r.get_json()["error"]

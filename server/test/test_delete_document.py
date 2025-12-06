@@ -1,6 +1,8 @@
 import io
 import sys
 from pathlib import Path
+import pytest # 确保已导入
+from unittest.mock import patch, MagicMock # 确保已导入
 
 # 让 Python 能找到 server/src/server.py
 THIS_FILE = Path(__file__).resolve()      # .../server/test/test_delete_document.py
@@ -44,7 +46,7 @@ def _signup_and_login(client):
     return {"Authorization": f"Bearer {token}"}
 
 
-def test_delete_document_roundtrip(client):
+def test_delete_document_roundtrip(client,mocker):
     # client = app.test_client()
     headers = _signup_and_login(client)
 
@@ -57,6 +59,19 @@ def test_delete_document_roundtrip(client):
     )
     assert resp.status_code == 201
     doc_id = resp.get_json()["id"]
+
+# 获取原始的 Path.exists 方法
+    original_exists = Path.exists
+    
+    def mock_exists(self):
+        # 如果路径包含我们上传的特定文件名，则返回 False，模拟文件丢失
+        if 'missing_on_disk.pdf' in str(self): 
+            return False 
+        # 否则，调用原始方法，确保其他文件路径检查 (如目录创建) 正常
+        return original_exists(self)
+
+    # 打补丁替换 Path.exists
+    mocker.patch('pathlib.Path.exists', side_effect=mock_exists)
 
     # 2. 删除此 PDF
     resp = client.delete(f"/api/delete-document/{doc_id}", headers=headers)
@@ -74,3 +89,7 @@ def test_delete_document_roundtrip(client):
     # 4. 再尝试删除 → 应该返回 404
     resp = client.delete(f"/api/delete-document/{doc_id}", headers=headers)
     assert resp.status_code == 404
+
+
+
+

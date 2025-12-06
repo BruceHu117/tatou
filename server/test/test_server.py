@@ -1,66 +1,3 @@
-# import tempfile
-# import pytest 
-
-
-
-# def test_safe_resolve_under_storage():
-#     """测试路径安全解析功能"""
-#     from server.src.server import _safe_resolve_under_storage
-#     from pathlib import Path
-    
-#     # 创建临时存储目录
-#     with tempfile.TemporaryDirectory() as temp_dir:
-#         storage_root = Path(temp_dir)
-        
-#         # 测试相对路径
-#         relative_path = "files/user/document.pdf"
-#         resolved = _safe_resolve_under_storage(relative_path, storage_root)
-#         assert resolved == storage_root / relative_path
-        
-#         # 测试绝对路径（在存储目录内）
-#         absolute_inside = storage_root / "files/test.pdf"
-#         resolved = _safe_resolve_under_storage(absolute_inside, storage_root)
-#         assert resolved == absolute_inside
-        
-#         # 测试路径遍历攻击（应该抛出异常）
-#         with pytest.raises(RuntimeError):
-#             _safe_resolve_under_storage("../../../etc/passwd", storage_root)
-
-# def test_upload_document_file_validation(mocker):
-#     """测试文件上传的验证逻辑"""
-#     # 这个测试会覆盖很多文件验证相关的变异
-#     from server.src.server import create_app
-#     import io
-
-#     app = create_app()
-    
-#     with app.test_client() as client:
-        
-#         # **重要：Mock 身份验证**
-#         # 模拟 Token 被成功解析，并设置 Flask 的全局 g.user 对象
-#         # 我们需要 Mock 装饰器内部使用的 _serializer.loads 方法
-        
-#         mock_serializer = mocker.patch('server.src.server._serializer')
-#         # 模拟 loads 方法返回一个有效的用户字典
-#         mock_serializer.return_value.loads.return_value = {"uid": 1, "login": "testuser", "email": "a@b.com"}
-        
-#         # 测试非PDF文件
-#         response = client.post('/api/upload-document',
-#                              data={'file': (io.BytesIO(b'not a pdf'), 'test.txt')},
-#                              headers={'Authorization': 'Bearer test-token'})
-#         # 现在身份验证会成功，并继续执行文件类型检查，应该返回 400
-#         assert response.status_code == 400
-        
-#         # 测试空文件
-#         response = client.post('/api/upload-document',
-#                              data={'file': (io.BytesIO(b''), 'empty.pdf')},
-#                              headers={'Authorization': 'Bearer test-token'})
-#         assert response.status_code == 400
-
-
-
-
-
 # server/test/test_server.py
 import tempfile
 import pytest
@@ -70,6 +7,8 @@ import sys
 import os
 from unittest.mock import patch, MagicMock
 from pathlib import Path
+from sqlalchemy.exc import DBAPIError # 导入 DBAPIError
+
 
 # 添加项目路径到 sys.path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
@@ -327,3 +266,67 @@ def test_upload_valid_pdf(client, auth_headers, sample_pdf_path):
 
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
+
+
+
+
+# ======================================================================
+# 数据库错误处理测试 (覆盖 503 错误分支)
+# ======================================================================
+
+def test_create_user_db_error_returns_503(client, mocker):
+    """
+    测试 create-user 在数据库执行过程中抛出 DBAPIError (L205)。
+    """
+    # 1. Mock get_engine，使其返回一个 Mock Engine
+    mock_engine = MagicMock()
+    # 2. Mock 事务连接对象 (conn)
+    mock_conn = mock_engine.begin.return_value.__enter__.return_value
+    
+    # 3. 强制 conn.execute 在尝试 INSERT 时抛出数据库异常
+    #    这将覆盖 L205 的 except 分支。
+    mock_conn.execute.side_effect = DBAPIError("Mocked DB error during insert", {}, {})
+    
+    # 4. 替换服务器中的 get_engine 函数
+    mocker.patch('server.src.server.get_engine', return_value=mock_engine)
+
+    # 运行请求
+    resp = client.post(
+        "/api/create-user", 
+        json={"email": "db_fail@example.com", "login": "db_fail_user", "password": "p"}
+    )
+    
+    # 断言：预期命中 except 分支，返回 503
+    assert resp.status_code == 503
+    resp_json = resp.get_json()
+    assert "database error" in resp_json["error"]
+    assert "Mocked DB error during insert" in resp_json["error"]
+
+
+def test_login_db_error_returns_503(client, mocker):
+    """
+    测试 login 在数据库查询过程中抛出 DBAPIError (L300-301)。
+    """
+    # 1. Mock get_engine，使其返回一个 Mock Engine
+    mock_engine = MagicMock()
+    # 2. Mock 连接对象 (conn)
+    mock_conn = mock_engine.connect.return_value.__enter__.return_value
+    
+    # 3. 强制 conn.execute 在尝试 SELECT 时抛出数据库异常
+    #    这将覆盖 L300-301 的 except 分支。
+    mock_conn.execute.side_effect = DBAPIError("Mocked DB error during select", {}, {})
+    
+    # 4. 替换服务器中的 get_engine 函数
+    mocker.patch('server.src.server.get_engine', return_value=mock_engine)
+
+    # 运行请求
+    resp = client.post(
+        "/api/login", 
+        json={"email": "any_user@example.com", "password": "p"}
+    )
+    
+    # 断言：预期命中 except 分支，返回 503
+    assert resp.status_code == 503
+    resp_json = resp.get_json()
+    assert "database error" in resp_json["error"]
+    assert "Mocked DB error during select" in resp_json["error"]
