@@ -7,7 +7,7 @@ import sys
 import os
 from unittest.mock import patch, MagicMock
 from pathlib import Path
-from sqlalchemy.exc import DBAPIError # 导入 DBAPIError
+# from sqlalchemy.exc import DBAPIError # 导入 DBAPIError
 
 
 # 添加项目路径到 sys.path

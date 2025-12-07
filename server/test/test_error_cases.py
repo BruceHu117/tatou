@@ -8,9 +8,9 @@ import pytest
 from itsdangerous import SignatureExpired, BadSignature
 from unittest.mock import MagicMock
 from collections import namedtuple 
-from sqlalchemy.exc import DBAPIError # 确保已导入
-from server.src import watermarking_utils as WMUtils # 确保已导入
-from server.src.server import get_engine # 确保已导入 get_engine 函数
+# from sqlalchemy.exc import DBAPIError # 确保已导入
+# from server.src import watermarking_utils as WMUtils # 确保已导入
+# from server.src.server import get_engine # 确保已导入 get_engine 函数
 
 # 导入 SQLAlchemy 异常 (如果需要 Mock 失败)
 from sqlalchemy.exc import IntegrityError, DBAPIError 
