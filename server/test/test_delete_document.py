@@ -74,7 +74,7 @@ def test_delete_document_roundtrip(client,mocker):
         return original_exists(self)
 
     # 打补丁替换 Path.exists
-    mocker.patch('pathlib.Path.exists', side_effect=mock_exists)
+    mock_patch = mocker.patch('pathlib.Path.exists', side_effect=mock_exists)
 
     # 2. 删除此 PDF
     resp = client.delete(f"/api/delete-document/{doc_id}", headers=headers)
@@ -82,6 +82,13 @@ def test_delete_document_roundtrip(client,mocker):
     body = resp.get_json()
     assert body["deleted"] is True
     assert body["id"] == doc_id
+
+
+
+# 确保在函数结束前移除 Mock
+    mock_patch.stop()
+
+
 
     # 3. 再次 list-documents → 此文件应该消失
     resp = client.get("/api/list-documents", headers=headers)
