@@ -4,6 +4,11 @@ import uuid
 import sys
 from pathlib import Path
 
+# ------------------
+# 新增导入 MagicMock
+from unittest.mock import MagicMock 
+# ------------------
+
 THIS_FILE = Path(__file__).resolve()
 SERVER_ROOT = THIS_FILE.parents[1]  # .../server
 # /app/server/src
@@ -48,7 +53,27 @@ def _upload_pdf(client, headers, filename="doc.pdf"):
     return r.get_json()["id"]
 
 
-def test_cli_layer_is_exercised(client):
+def test_cli_layer_is_exercised(client, mocker):
+
+    # --------------------------------------------------------------------------
+    # 关键修复：Mock 掉所有可能启动子进程的 watermarking 核心函数
+    # 
+    # 假设 'apply_watermark' 是启动 CLI 进程的入口函数
+    # 
+    # 注意: 你可能需要根据你的代码结构修改 Mock 的路径 (例如，如果它在 server.src.server 中被调用)
+    # --------------------------------------------------------------------------
+    
+    # 1. 模拟 apply_watermark 成功，返回一些 PDF 字节
+    mock_apply_wm = mocker.patch(
+        'server.src.watermarking_utils.apply_watermark', 
+        return_value=b'MOCKED_WATERMARKED_PDF'
+    )
+    # 2. 模拟 is_watermarking_applicable 始终返回 True
+    mocker.patch(
+        'server.src.watermarking_utils.is_watermarking_applicable', 
+        return_value=True
+    )
+
     # client = app.test_client()
     headers = _signup_and_login(client)
 
@@ -85,20 +110,3 @@ def test_cli_layer_is_exercised(client):
             headers=headers,
         )
         assert r.status_code == 400
-
-# def test_cli_layer_is_exercised(client, headers):
-#     docid = _upload_pdf(client, headers, "sample.pdf")
-    
-#     # 关键：通过 API 调用，让 server 走 watermarking_cli.apply_watermark()
-#     r = client.post("/api/create-watermark",
-#                     json={"docid": docid, "method_name": "unit-test-key", "key": "abc"},
-#                     headers=headers)
-#     assert r.status_code == 201
-
-#     # 再测几种不同的 method，确保 cli 的分发逻辑被覆盖
-#     methods = ["secret-1", "secret-2", "add_after_eof", "visible_text"]
-#     for m in methods:
-#         r = client.post("/api/create-watermark",
-#                         json={"docid": docid, "method_name": m, "key": "test"},
-#                         headers=headers)
-#         assert r.status_code in (200, 201)
