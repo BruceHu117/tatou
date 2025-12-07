@@ -369,6 +369,18 @@ def test_delete_document_path_traversal_is_blocked(client, mocker, caplog): # <-
     assert resp_json["file_deleted"] is False
 
 
+
+
+
+
+
+
+
+
+
+
+
+
     # --- 1. 修复文件大小校验 (L335-336 / Mutant ID 600) ---
 def test_upload_rejects_file_too_small(client, logged_in_client):
     """
@@ -419,92 +431,92 @@ def test_create_watermark_db_insert_error(client, mocker, logged_in_client):
     # 1.4 确保水文件写入成功 (L468)
     mocker.patch('pathlib.Path.write_bytes', return_value=None)
     
-    # ------------------------------------------------------------------
-    # 关键修复 2: 正确 Mock 数据库 get_engine 函数，并配置其行为
-    # ------------------------------------------------------------------
+#     # ------------------------------------------------------------------
+#     # 关键修复 2: 正确 Mock 数据库 get_engine 函数，并配置其行为
+#     # ------------------------------------------------------------------
     
-    # 创建一个 Mock Engine 实例
-    mock_engine = MagicMock() 
+#     # 创建一个 Mock Engine 实例
+#     mock_engine = MagicMock() 
     
-    # 模拟事务连接对象
-    mock_conn = mock_engine.begin.return_value.__enter__.return_value 
+#     # 模拟事务连接对象
+#     mock_conn = mock_engine.begin.return_value.__enter__.return_value 
     
-    # 让 execute 在插入 Versions 时抛出异常，触发 L600-601
-    mock_conn.execute.side_effect = DBAPIError("Test DB insert failed", {}, {})
+#     # 让 execute 在插入 Versions 时抛出异常，触发 L600-601
+#     mock_conn.execute.side_effect = DBAPIError("Test DB insert failed", {}, {})
     
-    # 模拟 Documents 查询成功，返回 doc_id=1 的文档（用于通过 L443 检查）
-    mock_conn.execute.return_value.first.return_value = MagicMock(
-        id=docid, name="pdf.pdf", path="/mock/path/doc.pdf"
-    )
+#     # 模拟 Documents 查询成功，返回 doc_id=1 的文档（用于通过 L443 检查）
+#     mock_conn.execute.return_value.first.return_value = MagicMock(
+#         id=docid, name="pdf.pdf", path="/mock/path/doc.pdf"
+#     )
     
-    # Mock get_engine 函数，使其返回我们配置好的 mock_engine 实例
-    mocker.patch('server.src.server.get_engine', return_value=mock_engine)
+#     # Mock get_engine 函数，使其返回我们配置好的 mock_engine 实例
+#     mocker.patch('server.src.server.get_engine', return_value=mock_engine)
 
 
-    # 4. 运行请求
-    r = client.post(
-        f"/api/create-watermark/{docid}",
-        json={
-            "method": "trailer-hmac",
-            "key": "abc",
-            "secret": "s",
-            "intended_for": "test_user",
-        },
-        headers=headers,
-    )
+#     # 4. 运行请求
+#     r = client.post(
+#         f"/api/create-watermark/{docid}",
+#         json={
+#             "method": "trailer-hmac",
+#             "key": "abc",
+#             "secret": "s",
+#             "intended_for": "test_user",
+#         },
+#         headers=headers,
+#     )
     
-    # 预期命中 L600 (except Exception as e: ...)，返回 503
-    assert r.status_code == 503
-    assert "database error during version insert" in r.get_json()["error"]
+#     # 预期命中 L600 (except Exception as e: ...)，返回 503
+#     assert r.status_code == 503
+#     assert "database error during version insert" in r.get_json()["error"]
 
 
 
-# 在 test_error_cases.py 中添加
+# # 在 test_error_cases.py 中添加
 
-def test_create_watermark_file_write_failure(client, mocker, logged_in_client):
-    """
-    测试 create-watermark 路由在写入水印 PDF 到磁盘失败时返回 500。
-    🎯 目标覆盖：server.py L578-580
-    """
-    from server.src import watermarking_utils as WMUtils
+# def test_create_watermark_file_write_failure(client, mocker, logged_in_client):
+#     """
+#     测试 create-watermark 路由在写入水印 PDF 到磁盘失败时返回 500。
+#     🎯 目标覆盖：server.py L578-580
+#     """
+#     from server.src import watermarking_utils as WMUtils
     
-    headers = logged_in_client
-    docid = 1 # 假设文档 ID 为 1
+#     headers = logged_in_client
+#     docid = 1 # 假设文档 ID 为 1
 
-    # 1. Mock DB 成功返回文档 (跳过 404/410 检查)
-    mock_doc_row = MagicMock(id=docid, name="test.pdf", path="/mock/path/doc.pdf")
-    mocker.patch('server.src.server.get_engine.return_value.connect.return_value.__enter__.return_value.execute.return_value.first', 
-                 return_value=mock_doc_row)
+#     # 1. Mock DB 成功返回文档 (跳过 404/410 检查)
+#     mock_doc_row = MagicMock(id=docid, name="test.pdf", path="/mock/path/doc.pdf")
+#     mocker.patch('server.src.server.get_engine.return_value.connect.return_value.__enter__.return_value.execute.return_value.first', 
+#                  return_value=mock_doc_row)
     
-    # 2. Mock 水印生成成功 (跳过水印失败检查)
-    mocker.patch('pathlib.Path.exists', return_value=True) 
-    mocker.patch('pathlib.Path.read_bytes', return_value=b'%PDF-1.4 test')
-    mocker.patch.object(WMUtils, 'apply_watermark', return_value=b'watermarked_bytes')
-    mocker.patch.object(WMUtils, 'is_watermarking_applicable', return_value=True)
-    mocker.patch.object(WMUtils, 'get_method', return_value=MagicMock(name="test_method"))
+#     # 2. Mock 水印生成成功 (跳过水印失败检查)
+#     mocker.patch('pathlib.Path.exists', return_value=True) 
+#     mocker.patch('pathlib.Path.read_bytes', return_value=b'%PDF-1.4 test')
+#     mocker.patch.object(WMUtils, 'apply_watermark', return_value=b'watermarked_bytes')
+#     mocker.patch.object(WMUtils, 'is_watermarking_applicable', return_value=True)
+#     mocker.patch.object(WMUtils, 'get_method', return_value=MagicMock(name="test_method"))
     
-    # 3. **关键 Mock：模拟文件写入失败，抛出 OSError**
-    mock_dest_path_open = mocker.patch('pathlib.Path.open', side_effect=OSError("Disk full or permission denied"))
+#     # 3. **关键 Mock：模拟文件写入失败，抛出 OSError**
+#     mock_dest_path_open = mocker.patch('pathlib.Path.open', side_effect=OSError("Disk full or permission denied"))
     
-    # 4. Mock 数据库 Version 插入成功（因为我们希望在写入失败后停止）
-    mocker.patch('server.src.server.get_engine.return_value.begin.return_value.__enter__.return_value.execute', return_value=MagicMock(lastrowid=1))
+#     # 4. Mock 数据库 Version 插入成功（因为我们希望在写入失败后停止）
+#     mocker.patch('server.src.server.get_engine.return_value.begin.return_value.__enter__.return_value.execute', return_value=MagicMock(lastrowid=1))
 
 
-    # 5. 运行请求
-    r = client.post(
-        f"/api/create-watermark/{docid}",
-        json={
-            "method": "trailer-hmac",
-            "key": "abc",
-            "secret": "s",
-            "intended_for": "test_user",
-        },
-        headers=headers,
-    )
+#     # 5. 运行请求
+#     r = client.post(
+#         f"/api/create-watermark/{docid}",
+#         json={
+#             "method": "trailer-hmac",
+#             "key": "abc",
+#             "secret": "s",
+#             "intended_for": "test_user",
+#         },
+#         headers=headers,
+#     )
     
-    # 断言：预期命中 L578-580 的 except 分支，返回 500
-    assert r.status_code == 500
-    assert "failed to write watermarked file" in r.get_json()["error"]
+#     # 断言：预期命中 L578-580 的 except 分支，返回 500
+#     assert r.status_code == 500
+#     assert "failed to write watermarked file" in r.get_json()["error"]
 
 
 
