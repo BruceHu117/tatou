@@ -13,9 +13,12 @@ def sample_pdf(tmp_path):
     # 修正：使用一个更完整的、能被 fitz 识别的极简 PDF 结构
     valid_pdf_bytes = (
         b"%PDF-1.4\n"
-        b"1 0 obj\n<<>>\nendobj\n"
-        b"xref\n0 2\n0000000000 65535 f \n0000000010 00000 n \n"
-        b"trailer\n<<>>\nstartxref\n20\n%%EOF\n" # 确保文件末尾有换行
+        b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
+        b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
+        b"3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >>\nendobj\n"
+        b"4 0 obj\n<< /Length 0 >>\nstream\nendstream\nendobj\n"
+        b"xref\n0 5\n0000000000 65535 f \n0000000010 00000 n \n0000000055 00000 n \n0000000108 00000 n \n0000000213 00000 n \n"
+        b"trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n300\n%%EOF\n"
     )
 
     pdf.write_bytes(valid_pdf_bytes)
