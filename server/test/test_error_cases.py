@@ -502,12 +502,16 @@ def test_create_watermark_file_write_failure(client, mocker, logged_in_client):
     mock_conn = mock_engine.connect.return_value.__enter__.return_value
     mock_conn.execute.return_value.first.return_value = mock_doc_row # <-- 修正后的配置
 
+    # **新增修正：Mock 路径安全解析**
+    # 假设安全解析函数在 src.server 中
+    mocker.patch('server.src.server._safe_resolve_under_storage', 
+                 return_value=Path("/mock/path/doc.pdf")) # 确保路径解析通过
+
     # 2. Mock 水印生成成功 (跳过水印失败检查)
-    # mocker.patch('pathlib.Path.exists', return_value=True) 
-    # mocker.patch('pathlib.Path.read_bytes', return_value=b'%PDF-1.4 test')
+    mocker.patch('pathlib.Path.exists', return_value=True) 
+    mocker.patch('pathlib.Path.read_bytes', return_value=b'%PDF-1.4 test')
     # mocker.patch.object(WMUtils, 'apply_watermark', return_value=b'watermarked_bytes')
     # mocker.patch.object(WMUtils, 'is_watermarking_applicable', return_value=True)
-    # mocker.patch.object(WMUtils, 'get_method', return_value=MagicMock(name="test_method"))
 
     mocker.patch('server.src.server.get_engine', return_value=mock_engine)
 
