@@ -488,7 +488,6 @@ def test_create_watermark_file_write_failure(client, mocker, logged_in_client):
     测试 create-watermark 路由在写入水印 PDF 到磁盘失败时返回 500。
     🎯 目标覆盖：server.py L578-580
     """
-    from server.src import watermarking_utils as WMUtils
     
     headers = logged_in_client
     docid = 1 # 假设文档 ID 为 1
