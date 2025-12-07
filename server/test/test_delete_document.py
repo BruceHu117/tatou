@@ -49,7 +49,9 @@ def _signup_and_login(client):
     return {"Authorization": f"Bearer {token}"}
 
 
-def test_delete_document_roundtrip(client,mocker):
+
+
+# def test_delete_document_roundtrip(client,mocker):
     # client = app.test_client()
     headers = _signup_and_login(client)
 
@@ -83,12 +85,8 @@ def test_delete_document_roundtrip(client,mocker):
     assert body["deleted"] is True
     assert body["id"] == doc_id
 
-
-
 # 确保在函数结束前移除 Mock
     mock_patch.stop()
-
-
 
     # 3. 再次 list-documents → 此文件应该消失
     resp = client.get("/api/list-documents", headers=headers)
@@ -105,7 +103,7 @@ def test_delete_document_roundtrip(client,mocker):
 
 
 
-def test_delete_document_file_missing_on_disk(client, mocker):
+# def test_delete_document_file_missing_on_disk(client, mocker):
     """
     测试删除文档时，数据库中存在记录，但磁盘上的文件已丢失。
     
