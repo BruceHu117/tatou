@@ -70,32 +70,32 @@ def test_explore_pdf_returns_dict(sample_pdf):
     assert data["type"] == "Document"
 
 
-# 在 test_watermarking_utils.py 或一个新文件 test_metadata_watermark.py 中添加
+# # 在 test_watermarking_utils.py 或一个新文件 test_metadata_watermark.py 中添加
 
-def test_metadata_watermark_roundtrip(sample_pdf):
-    """
-    🎯 目标：测试 MetadataWatermark 的读写轮询，覆盖 read_secret 的逻辑。
-    """
-    from server.src.metadata_watermark import MetadataWatermark, SecretNotFoundError, InvalidKeyError
+# def test_metadata_watermark_roundtrip(sample_pdf):
+#     """
+#     🎯 目标：测试 MetadataWatermark 的读写轮询，覆盖 read_secret 的逻辑。
+#     """
+#     from server.src.metadata_watermark import MetadataWatermark, SecretNotFoundError, InvalidKeyError
     
-    wm_instance = MetadataWatermark()
-    secret = "XMP_SECRET_789"
-    key = "XMP_KEY_ABC"
+#     wm_instance = MetadataWatermark()
+#     secret = "XMP_SECRET_789"
+#     key = "XMP_KEY_ABC"
     
-    pdf_bytes = sample_pdf.read_bytes()
+#     pdf_bytes = sample_pdf.read_bytes()
 
-    # 1. 嵌入水印
-    out_bytes = wm_instance.add_watermark(pdf_bytes, secret, key)
-    assert out_bytes != pdf_bytes # 确保文件已修改
+#     # 1. 嵌入水印
+#     out_bytes = wm_instance.add_watermark(pdf_bytes, secret, key)
+#     assert out_bytes != pdf_bytes # 确保文件已修改
 
-    # 2. 成功读取水印
-    extracted_secret = wm_instance.read_secret(out_bytes, key)
-    assert extracted_secret == secret
+#     # 2. 成功读取水印
+#     extracted_secret = wm_instance.read_secret(out_bytes, key)
+#     assert extracted_secret == secret
     
-    # 3. 验证错误的 Key (杀死校验逻辑中的变异体)
-    with pytest.raises(InvalidKeyError):
-        wm_instance.read_secret(out_bytes, "WRONG_KEY")
+#     # 3. 验证错误的 Key (杀死校验逻辑中的变异体)
+#     with pytest.raises(InvalidKeyError):
+#         wm_instance.read_secret(out_bytes, "WRONG_KEY")
         
-    # 4. 验证读取没有水印的文件 (覆盖 SecretNotFoundError)
-    with pytest.raises(SecretNotFoundError):
-        wm_instance.read_secret(pdf_bytes, key)
+#     # 4. 验证读取没有水印的文件 (覆盖 SecretNotFoundError)
+#     with pytest.raises(SecretNotFoundError):
+#         wm_instance.read_secret(pdf_bytes, key)

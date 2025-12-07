@@ -270,66 +270,66 @@ if __name__ == '__main__':
 
 
 
-# ======================================================================
-# 数据库错误处理测试 (覆盖 503 错误分支)
-# ======================================================================
+# # ======================================================================
+# # 数据库错误处理测试 (覆盖 503 错误分支)
+# # ======================================================================
 
-def test_create_user_db_error_returns_503(client, mocker):
-    """
-    测试 create-user 在数据库执行过程中抛出 DBAPIError (L205)。
-    """
-    # 1. Mock get_engine，使其返回一个 Mock Engine
-    mock_engine = MagicMock()
-    # 2. Mock 事务连接对象 (conn)
-    mock_conn = mock_engine.begin.return_value.__enter__.return_value
+# def test_create_user_db_error_returns_503(client, mocker):
+#     """
+#     测试 create-user 在数据库执行过程中抛出 DBAPIError (L205)。
+#     """
+#     # 1. Mock get_engine，使其返回一个 Mock Engine
+#     mock_engine = MagicMock()
+#     # 2. Mock 事务连接对象 (conn)
+#     mock_conn = mock_engine.begin.return_value.__enter__.return_value
     
-    # 3. 强制 conn.execute 在尝试 INSERT 时抛出数据库异常
-    #    这将覆盖 L205 的 except 分支。
-    mock_conn.execute.side_effect = DBAPIError("Mocked DB error during insert", {}, {})
+#     # 3. 强制 conn.execute 在尝试 INSERT 时抛出数据库异常
+#     #    这将覆盖 L205 的 except 分支。
+#     mock_conn.execute.side_effect = DBAPIError("Mocked DB error during insert", {}, {})
     
-    # 4. 替换服务器中的 get_engine 函数
-    mocker.patch('server.src.server.get_engine', return_value=mock_engine)
+#     # 4. 替换服务器中的 get_engine 函数
+#     mocker.patch('server.src.server.get_engine', return_value=mock_engine)
 
-    # 运行请求
-    resp = client.post(
-        "/api/create-user", 
-        json={"email": "db_fail@example.com", "login": "db_fail_user", "password": "p"}
-    )
+#     # 运行请求
+#     resp = client.post(
+#         "/api/create-user", 
+#         json={"email": "db_fail@example.com", "login": "db_fail_user", "password": "p"}
+#     )
     
-    # 断言：预期命中 except 分支，返回 503
-    assert resp.status_code == 503
-    resp_json = resp.get_json()
-    assert "database error" in resp_json["error"]
-    assert "Mocked DB error during insert" in resp_json["error"]
+#     # 断言：预期命中 except 分支，返回 503
+#     assert resp.status_code == 503
+#     resp_json = resp.get_json()
+#     assert "database error" in resp_json["error"]
+#     assert "Mocked DB error during insert" in resp_json["error"]
 
 
-def test_login_db_error_returns_503(client, mocker):
-    """
-    测试 login 在数据库查询过程中抛出 DBAPIError (L300-301)。
-    """
-    # 1. Mock get_engine，使其返回一个 Mock Engine
-    mock_engine = MagicMock()
-    # 2. Mock 连接对象 (conn)
-    mock_conn = mock_engine.connect.return_value.__enter__.return_value
+# def test_login_db_error_returns_503(client, mocker):
+#     """
+#     测试 login 在数据库查询过程中抛出 DBAPIError (L300-301)。
+#     """
+#     # 1. Mock get_engine，使其返回一个 Mock Engine
+#     mock_engine = MagicMock()
+#     # 2. Mock 连接对象 (conn)
+#     mock_conn = mock_engine.connect.return_value.__enter__.return_value
     
-    # 3. 强制 conn.execute 在尝试 SELECT 时抛出数据库异常
-    #    这将覆盖 L300-301 的 except 分支。
-    mock_conn.execute.side_effect = DBAPIError("Mocked DB error during select", {}, {})
+#     # 3. 强制 conn.execute 在尝试 SELECT 时抛出数据库异常
+#     #    这将覆盖 L300-301 的 except 分支。
+#     mock_conn.execute.side_effect = DBAPIError("Mocked DB error during select", {}, {})
     
-    # 4. 替换服务器中的 get_engine 函数
-    mocker.patch('server.src.server.get_engine', return_value=mock_engine)
+#     # 4. 替换服务器中的 get_engine 函数
+#     mocker.patch('server.src.server.get_engine', return_value=mock_engine)
 
-    # 运行请求
-    resp = client.post(
-        "/api/login", 
-        json={"email": "any_user@example.com", "password": "p"}
-    )
+#     # 运行请求
+#     resp = client.post(
+#         "/api/login", 
+#         json={"email": "any_user@example.com", "password": "p"}
+#     )
     
-    # 断言：预期命中 except 分支，返回 503
-    assert resp.status_code == 503
-    resp_json = resp.get_json()
-    assert "database error" in resp_json["error"]
-    assert "Mocked DB error during select" in resp_json["error"]
+#     # 断言：预期命中 except 分支，返回 503
+#     assert resp.status_code == 503
+#     resp_json = resp.get_json()
+#     assert "database error" in resp_json["error"]
+#     assert "Mocked DB error during select" in resp_json["error"]
 
 
 

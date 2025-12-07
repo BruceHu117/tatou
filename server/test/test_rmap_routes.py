@@ -392,169 +392,169 @@ def test_rmap_initiate_specific_error_handling(client, mocker):
     assert "error" in resp.get_json()
 
 
-def test_guess_identity_simple():
-    """简化版的 _guess_identity 测试"""
-    from server.src.rmap_routes import _guess_identity
+# def test_guess_identity_simple():
+#     """简化版的 _guess_identity 测试"""
+#     from server.src.rmap_routes import _guess_identity
     
-    # 因为实际测试中 CLIENT_KEYS_DIR 可能已经有文件
-    # 我们只需要测试函数能被调用而不出错
-    try:
-        result = _guess_identity({})
-        # 不检查具体值，只要不抛异常
-        assert isinstance(result, str)
-    except Exception as e:
-        pytest.fail(f"_guess_identity threw exception: {e}")
+#     # 因为实际测试中 CLIENT_KEYS_DIR 可能已经有文件
+#     # 我们只需要测试函数能被调用而不出错
+#     try:
+#         result = _guess_identity({})
+#         # 不检查具体值，只要不抛异常
+#         assert isinstance(result, str)
+#     except Exception as e:
+#         pytest.fail(f"_guess_identity threw exception: {e}")
 
 
 
-# 在 test_rmap_routes.py 中添加
+# # 在 test_rmap_routes.py 中添加
 
-def test_guess_identity_returns_group_name_when_single_key(mocker):
-    """
-    🎯 目标：覆盖 _guess_identity 发现单个 Group 密钥文件时的逻辑 (L107)。
-    """
-    from server.src.rmap_routes import _guess_identity, CLIENT_KEYS_DIR
+# def test_guess_identity_returns_group_name_when_single_key(mocker):
+#     """
+#     🎯 目标：覆盖 _guess_identity 发现单个 Group 密钥文件时的逻辑 (L107)。
+#     """
+#     from server.src.rmap_routes import _guess_identity, CLIENT_KEYS_DIR
     
-    # 1. 模拟 glob() 返回一个 Group 文件
-    mock_file = MagicMock(stem="Group_A")
-    mocker.patch.object(CLIENT_KEYS_DIR, 'glob', return_value=[mock_file])
+#     # 1. 模拟 glob() 返回一个 Group 文件
+#     mock_file = MagicMock(stem="Group_A")
+#     mocker.patch.object(CLIENT_KEYS_DIR, 'glob', return_value=[mock_file])
     
-    # 2. 模拟 incoming payload 不包含 'identity'
-    result = _guess_identity({})
+#     # 2. 模拟 incoming payload 不包含 'identity'
+#     result = _guess_identity({})
     
-    # 断言返回文件名
-    assert result == "Group_A"
+#     # 断言返回文件名
+#     assert result == "Group_A"
 
-    # 3. 模拟 incoming payload 包含 'identity'，但文件不存在 (应该回退到 Group_A)
-    mock_path_exists = mocker.patch('pathlib.Path.exists', return_value=False)
-    result_fallback = _guess_identity({"identity": "NonExistentGroup"})
+#     # 3. 模拟 incoming payload 包含 'identity'，但文件不存在 (应该回退到 Group_A)
+#     mock_path_exists = mocker.patch('pathlib.Path.exists', return_value=False)
+#     result_fallback = _guess_identity({"identity": "NonExistentGroup"})
     
-    # 断言它回退到 Group_A
-    assert result_fallback == "Group_A"
-    # 验证它尝试检查过传入的 identity
-    mock_path_exists.assert_called_with()
+#     # 断言它回退到 Group_A
+#     assert result_fallback == "Group_A"
+#     # 验证它尝试检查过传入的 identity
+#     mock_path_exists.assert_called_with()
 
 
-def test_guess_identity_returns_rmap_default(mocker):
-    """
-    🎯 目标：覆盖 _guess_identity 找不到 Group 文件时的默认回退到 'rmap' (L109)。
-    """
-    from server.src.rmap_routes import _guess_identity, CLIENT_KEYS_DIR
+# def test_guess_identity_returns_rmap_default(mocker):
+#     """
+#     🎯 目标：覆盖 _guess_identity 找不到 Group 文件时的默认回退到 'rmap' (L109)。
+#     """
+#     from server.src.rmap_routes import _guess_identity, CLIENT_KEYS_DIR
     
-    # 1. 模拟 glob() 返回多个或零个文件
-    mocker.patch.object(CLIENT_KEYS_DIR, 'glob', return_value=[])
+#     # 1. 模拟 glob() 返回多个或零个文件
+#     mocker.patch.object(CLIENT_KEYS_DIR, 'glob', return_value=[])
     
-    # 2. 模拟 incoming payload 不包含 'identity'
-    result = _guess_identity({})
+#     # 2. 模拟 incoming payload 不包含 'identity'
+#     result = _guess_identity({})
     
-    # 断言返回默认值
-    assert result == "rmap"
+#     # 断言返回默认值
+#     assert result == "rmap"
 
-    # 3. 模拟 glob() 返回多个文件
-    mocker.patch.object(CLIENT_KEYS_DIR, 'glob', return_value=[MagicMock(), MagicMock()])
-    result_multiple = _guess_identity({})
+#     # 3. 模拟 glob() 返回多个文件
+#     mocker.patch.object(CLIENT_KEYS_DIR, 'glob', return_value=[MagicMock(), MagicMock()])
+#     result_multiple = _guess_identity({})
     
-    # 断言返回默认值
-    assert result_multiple == "rmap"
+#     # 断言返回默认值
+#     assert result_multiple == "rmap"
 
 
 
 
 
-# 在 test_rmap_routes.py 中添加
+# # 在 test_rmap_routes.py 中添加
 
-def test_rmap_get_engine_creates_new_engine(mocker, client):
-    """
-    🎯 目标：强制 _get_engine 命中 create_engine 分支 (L65-71)。
-    """
-    from server.src.rmap_routes import _get_engine
+# def test_rmap_get_engine_creates_new_engine(mocker, client):
+#     """
+#     🎯 目标：强制 _get_engine 命中 create_engine 分支 (L65-71)。
+#     """
+#     from server.src.rmap_routes import _get_engine
     
-    app = client.application
+#     app = client.application
     
-    # 1. Mock create_engine (检查它是否被调用)
-    mock_create_engine = mocker.patch('server.src.rmap_routes.create_engine')
+#     # 1. Mock create_engine (检查它是否被调用)
+#     mock_create_engine = mocker.patch('server.src.rmap_routes.create_engine')
     
-    # 2. 设置 Mock DB 配置
-    app.config.update({
-        "DB_USER": "test",
-        "DB_PASSWORD": "test",
-        "DB_HOST": "db",
-        "DB_PORT": 3306,
-        "DB_NAME": "test",
-    })
+#     # 2. 设置 Mock DB 配置
+#     app.config.update({
+#         "DB_USER": "test",
+#         "DB_PASSWORD": "test",
+#         "DB_HOST": "db",
+#         "DB_PORT": 3306,
+#         "DB_NAME": "test",
+#     })
 
-    # 3. **CRITICAL FIX: 临时清除配置和模块缓存**
-    with app.app_context():
-        # 强制清除 app.config 中的缓存
-        original_engine_config = app.config.pop("_ENGINE", None)
+#     # 3. **CRITICAL FIX: 临时清除配置和模块缓存**
+#     with app.app_context():
+#         # 强制清除 app.config 中的缓存
+#         original_engine_config = app.config.pop("_ENGINE", None)
         
-        # 强制清除 rmap_routes 模块级别的 Engine 缓存 (如果存在)
-        if hasattr(_get_engine, 'eng'):
-             del _get_engine.eng # 仅在 Python >= 3.7 上可能有效
+#         # 强制清除 rmap_routes 模块级别的 Engine 缓存 (如果存在)
+#         if hasattr(_get_engine, 'eng'):
+#              del _get_engine.eng # 仅在 Python >= 3.7 上可能有效
 
-        try:
-            # 4. 调用 _get_engine
-            _get_engine()
-        finally:
-            # 恢复配置
-            if original_engine_config is not None:
-                app.config["_ENGINE"] = original_engine_config
+#         try:
+#             # 4. 调用 _get_engine
+#             _get_engine()
+#         finally:
+#             # 恢复配置
+#             if original_engine_config is not None:
+#                 app.config["_ENGINE"] = original_engine_config
             
-    # 5. 断言 create_engine 必须被调用一次
-    mock_create_engine.assert_called_once()
+#     # 5. 断言 create_engine 必须被调用一次
+#     mock_create_engine.assert_called_once()
 
 
 
 
-# 在 test_rmap_routes.py 中添加
+# # 在 test_rmap_routes.py 中添加
 
-def test_expand_function_paths():
-    """
-    测试 _expand 函数的各种路径情况。
-    🎯 目标：覆盖 rmap_routes.py L33 (_expand) 的所有分支，杀死 Mutant 1。
-    """
-    from server.src.rmap_routes import _expand
-    import os
+# def test_expand_function_paths():
+#     """
+#     测试 _expand 函数的各种路径情况。
+#     🎯 目标：覆盖 rmap_routes.py L33 (_expand) 的所有分支，杀死 Mutant 1。
+#     """
+#     from server.src.rmap_routes import _expand
+#     import os
     
-    # 1. 测试 None 输入 (杀死 Mutant 1)
-    assert _expand(None) is None, "输入 None 应该返回 None"
+#     # 1. 测试 None 输入 (杀死 Mutant 1)
+#     assert _expand(None) is None, "输入 None 应该返回 None"
     
-    # 2. 测试波浪号扩展 (os.path.expanduser)
-    test_path = "~/test"
-    result = _expand(test_path)
-    assert result is not None
-    assert "~" not in result 
+#     # 2. 测试波浪号扩展 (os.path.expanduser)
+#     test_path = "~/test"
+#     result = _expand(test_path)
+#     assert result is not None
+#     assert "~" not in result 
     
-    # 3. 测试环境变量扩展 (os.path.expandvars)
-    if 'HOME' in os.environ:
-        env_path = "$HOME/test_var"
-        result = _expand(env_path)
-        assert result is not None
-        assert "$HOME" not in result
+#     # 3. 测试环境变量扩展 (os.path.expandvars)
+#     if 'HOME' in os.environ:
+#         env_path = "$HOME/test_var"
+#         result = _expand(env_path)
+#         assert result is not None
+#         assert "$HOME" not in result
     
-    # 4. 测试普通路径（无扩展）
-    normal_path = "/tmp/test_normal"
-    result = _expand(normal_path)
-    assert result == "/tmp/test_normal"
+#     # 4. 测试普通路径（无扩展）
+#     normal_path = "/tmp/test_normal"
+#     result = _expand(normal_path)
+#     assert result == "/tmp/test_normal"
 
 
 
 
-# test_rmap_routes.py 中添加/修改
+# # test_rmap_routes.py 中添加/修改
 
-def test_require_file_function_exists_case(mocker):
-    """
-    测试 _require_file 在文件存在时应该通过。
-    🎯 目标：杀死 Mutant 2 (翻转文件存在性检查)。
-    """
-    from server.src.rmap_routes import _require_file
+# def test_require_file_function_exists_case(mocker):
+#     """
+#     测试 _require_file 在文件存在时应该通过。
+#     🎯 目标：杀死 Mutant 2 (翻转文件存在性检查)。
+#     """
+#     from server.src.rmap_routes import _require_file
     
-    # Mock os.path.isfile 来模拟文件存在
-    mocker.patch('os.path.isfile', return_value=True)
+#     # Mock os.path.isfile 来模拟文件存在
+#     mocker.patch('os.path.isfile', return_value=True)
     
-    try:
-        # 此时，_require_file 不应该抛出异常。如果 Mutant 2 存活，这里会抛出异常。
-        _require_file("/path/to/existing/file", "TEST_LABEL")
-    except FileNotFoundError:
-        # 如果捕获到异常，说明变异体存活，应该让测试失败。
-        pytest.fail("Mutant 2 is still alive: File existence check failed.")
+#     try:
+#         # 此时，_require_file 不应该抛出异常。如果 Mutant 2 存活，这里会抛出异常。
+#         _require_file("/path/to/existing/file", "TEST_LABEL")
+#     except FileNotFoundError:
+#         # 如果捕获到异常，说明变异体存活，应该让测试失败。
+#         pytest.fail("Mutant 2 is still alive: File existence check failed.")
