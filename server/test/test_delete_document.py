@@ -1,7 +1,7 @@
 import io
 import sys
 from pathlib import Path
-# import pytest # 确保已导入
+import pytest # 确保已导入
 from unittest.mock import patch, MagicMock # 确保已导入
 
 
@@ -98,46 +98,46 @@ def test_delete_document_roundtrip(client,mocker):
 
 
 
-# def test_delete_document_file_missing_on_disk(client, mocker):
-#     """
-#     测试删除文档时，数据库中存在记录，但磁盘上的文件已丢失。
+def test_delete_document_file_missing_on_disk(client, mocker):
+    """
+    测试删除文档时，数据库中存在记录，但磁盘上的文件已丢失。
     
-#     🎯 目标覆盖：server.py L822 (else: file_missing = True)
-#     """
-#     # 1. 设置环境：确保用户登录
-#     headers = _signup_and_login(client)
+    🎯 目标覆盖：server.py L822 (else: file_missing = True)
+    """
+    # 1. 设置环境：确保用户登录
+    headers = _signup_and_login(client)
 
-#     # 2. 上传文件 (确保 DB 中有记录，并拿到 ID)
-#     resp = client.post(
-#         "/api/upload-document",
-#         data={"file": (io.BytesIO(_sample_pdf_bytes()), "missing_on_disk.pdf")},
-#         headers=headers,
-#         content_type="multipart/form-data",
-#     )
-#     assert resp.status_code == 201
-#     doc_id = resp.get_json()["id"]
+    # 2. 上传文件 (确保 DB 中有记录，并拿到 ID)
+    resp = client.post(
+        "/api/upload-document",
+        data={"file": (io.BytesIO(_sample_pdf_bytes()), "missing_on_disk.pdf")},
+        headers=headers,
+        content_type="multipart/form-data",
+    )
+    assert resp.status_code == 201
+    doc_id = resp.get_json()["id"]
 
-#     # 3. Mock Path.exists()，使其对目标文件路径返回 False
+    # 3. Mock Path.exists()，使其对目标文件路径返回 False
     
-#     # 原始的 Path.exists 方法
-#     original_exists = Path.exists
+    # 原始的 Path.exists 方法
+    original_exists = Path.exists
     
-#     def mock_exists(self):
-#         # 如果路径包含我们上传的特定文件名，则返回 False，模拟文件丢失
-#         if 'missing_on_disk.pdf' in str(self): 
-#             return False 
-#         # 否则，调用原始方法，确保其他文件路径检查 (如目录创建) 正常
-#         return original_exists(self) 
+    def mock_exists(self):
+        # 如果路径包含我们上传的特定文件名，则返回 False，模拟文件丢失
+        if 'missing_on_disk.pdf' in str(self): 
+            return False 
+        # 否则，调用原始方法，确保其他文件路径检查 (如目录创建) 正常
+        return original_exists(self) 
         
-#     # 打补丁替换 Path.exists
-#     mocker.patch('pathlib.Path.exists', side_effect=mock_exists)
+    # 打补丁替换 Path.exists
+    mocker.patch('pathlib.Path.exists', side_effect=mock_exists)
 
-#     # 4. 执行删除操作
-#     resp = client.delete(f"/api/delete-document/{doc_id}", headers=headers)
-#     assert resp.status_code == 200
-#     body = resp.get_json()
+    # 4. 执行删除操作
+    resp = client.delete(f"/api/delete-document/{doc_id}", headers=headers)
+    assert resp.status_code == 200
+    body = resp.get_json()
     
-#     # 5. 断言结果
-#     assert body["deleted"] is True
-#     assert body["file_deleted"] is False # 文件操作没被执行
-#     assert body["file_missing"] is True # 命中 L822
+    # 5. 断言结果
+    assert body["deleted"] is True
+    assert body["file_deleted"] is False # 文件操作没被执行
+    assert body["file_missing"] is True # 命中 L822
