@@ -194,8 +194,8 @@ def rmap_get_link():
             with eng.begin()as conn:
                 conn.execute(
                     text("""
-                        INSERT INTO Versions (link, path, intended_for, method, documentid)
-                        VALUES (:link, :path, :intended_for, :method, :documentid)
+                        INSERT INTO Versions (link, path, intended_for, method, documentid, secret)
+                        VALUES (:link, :path, :intended_for, :method, :documentid, :secret)
                     """),
                     {
                         "link": secret,
