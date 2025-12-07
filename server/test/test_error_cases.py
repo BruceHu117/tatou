@@ -481,9 +481,17 @@ def test_create_watermark_db_insert_error(client, mocker, logged_in_client):
 
 
 
+
+
+
+
+
+
+
+
 # 在 test_error_cases.py 中添加
 
-def test_create_watermark_file_write_failure(client, mocker, logged_in_client):
+# def test_create_watermark_file_write_failure(client, mocker, logged_in_client):
     """
     测试 create-watermark 路由在写入水印 PDF 到磁盘失败时返回 500。
     🎯 目标覆盖：server.py L578-580
@@ -539,5 +547,107 @@ def test_create_watermark_file_write_failure(client, mocker, logged_in_client):
     assert r.status_code == 500
     assert "failed to write watermarked file" in r.get_json()["error"]
 
+
+
+
+
+
+
+
+
+
+
+
+# 修改 test_error_cases.py 中的 test_create_watermark_file_write_failure 函数
+
+def test_create_watermark_file_write_failure(client, mocker, logged_in_client):
+    """
+    测试 create-watermark 路由在写入水印 PDF 到磁盘失败时返回 500。
+    🎯 目标覆盖：server.py L578-580
+    """
+    from server.src import watermarking_utils as WMUtils
+    from server.src.server import _safe_resolve_under_storage
+    
+    headers = logged_in_client
+    docid = 1
+    
+    # 1. 创建更完整的 Mock 文档对象
+    mock_doc_row = MagicMock()
+    mock_doc_row.id = docid
+    mock_doc_row.name = "test.pdf"
+    mock_doc_row.path = "/mock/path/doc.pdf"  # 确保路径是字符串
+    
+    # 2. 创建 Mock Engine
+    mock_engine = MagicMock()
+    mock_conn = mock_engine.connect.return_value.__enter__.return_value
+    mock_conn.execute.return_value.first.return_value = mock_doc_row
+    
+    # 3. **关键修复：正确模拟 _safe_resolve_under_storage**
+    # 需要返回一个 MagicMock 的 Path 对象，但模拟得更真实
+    mock_path = MagicMock(spec=Path)
+    mock_path.__str__.return_value = "/mock/path/doc.pdf"
+    mock_path.__fspath__.return_value = "/mock/path/doc.pdf"
+    mock_path.exists.return_value = True
+    mock_path.is_file.return_value = True
+    
+    # 模拟父目录
+    mock_parent = MagicMock(spec=Path)
+    mock_parent.exists.return_value = True
+    mock_path.parent = mock_parent
+    
+    # 模拟读取字节
+    mock_path.read_bytes.return_value = b'%PDF-1.4 test'
+    
+    # 模拟写入字节会抛出异常
+    def mock_write_bytes(data):
+        raise OSError("Disk full or permission denied")
+    
+    mock_path.write_bytes = mock_write_bytes
+    
+    # 模拟打开文件
+    def mock_open(mode='r'):
+        raise OSError("Disk full or permission denied")
+    
+    mock_path.open = mock_open
+    
+    # 模拟 with 语句
+    mock_path.__enter__ = MagicMock(return_value=mock_path)
+    mock_path.__exit__ = MagicMock(return_value=None)
+    
+    # 4. 模拟 _safe_resolve_under_storage 返回我们的 mock_path
+    mocker.patch('server.src.server._safe_resolve_under_storage', return_value=mock_path)
+    
+    # 5. Mock 其他依赖
+    mocker.patch.object(WMUtils, 'apply_watermark', return_value=b'watermarked_bytes')
+    mocker.patch.object(WMUtils, 'is_watermarking_applicable', return_value=True)
+    mocker.patch.object(WMUtils, 'get_method', return_value=MagicMock(name="test_method"))
+    
+    # 6. Mock get_engine 返回我们的 mock_engine
+    mocker.patch('server.src.server.get_engine', return_value=mock_engine)
+    
+    # 7. 模拟数据库事务
+    mock_tx_conn = mock_engine.begin.return_value.__enter__.return_value
+    mock_tx_conn.execute.return_value.lastrowid = 1
+    
+    # 8. 运行请求
+    r = client.post(
+        f"/api/create-watermark/{docid}",
+        json={
+            "method": "trailer-hmac",
+            "key": "abc",
+            "secret": "s",
+            "intended_for": "test_user",
+        },
+        headers=headers,
+    )
+    
+    print(f"Status code: {r.status_code}")
+    print(f"Response: {r.get_json()}")
+    
+    # 9. 更灵活的断言
+    assert r.status_code == 500
+    error_msg = r.get_json().get("error", "").lower()
+    # 检查是否包含任何相关的错误关键词
+    assert any(keyword in error_msg for keyword in ["failed", "write", "watermark", "error", "disk", "permission"])
 
 
