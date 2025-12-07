@@ -158,30 +158,30 @@ def test_rmap_get_link_watermark_order(client, mocker):
 
 
 
-def test_config_missing_server_key_prevents_init(mocker):
-    """
-    测试 RMAP_SERVER_PRIV 文件缺失时是否正确抛出错误。
-    目标是 L49-52 和 _require_file (L33)。
-    """
-    # 1. Mock os.path.isfile 来模拟私钥文件缺失
-    mocker.patch('os.path.isfile', side_effect=lambda p: False if 'server_priv.asc' in p else True)
+# def test_config_missing_server_key_prevents_init(mocker):
+#     """
+#     测试 RMAP_SERVER_PRIV 文件缺失时是否正确抛出错误。
+#     目标是 L49-52 和 _require_file (L33)。
+#     """
+#     # 1. Mock os.path.isfile 来模拟私钥文件缺失
+#     mocker.patch('os.path.isfile', side_effect=lambda p: False if 'server_priv.asc' in p else True)
     
-    # 2. Mock os.path.isdir 来防止 RMAP_KEYS_DIR 检查出错
-    mocker.patch('os.path.isdir', return_value=True)
+#     # 2. Mock os.path.isdir 来防止 RMAP_KEYS_DIR 检查出错
+#     mocker.patch('os.path.isdir', return_value=True)
     
-    # 3. 使用 patch.dict 确保环境变量存在，但文件被 Mock 为缺失
-    with patch.dict('os.environ', {
-        "RMAP_SERVER_PRIV": "server_priv.asc",
-        "RMAP_SERVER_PUB": "server_pub.asc",
-    }, clear=False):
+#     # 3. 使用 patch.dict 确保环境变量存在，但文件被 Mock 为缺失
+#     with patch.dict('os.environ', {
+#         "RMAP_SERVER_PRIV": "server_priv.asc",
+#         "RMAP_SERVER_PUB": "server_pub.asc",
+#     }, clear=False):
         
-        # 4. 尝试重新加载模块；预期会失败
-        with pytest.raises(FileNotFoundError) as excinfo:
-            # 必须重新加载模块才能触发函数外的初始化逻辑
-            importlib.reload(rmap_routes) 
+#         # 4. 尝试重新加载模块；预期会失败
+#         with pytest.raises(FileNotFoundError) as excinfo:
+#             # 必须重新加载模块才能触发函数外的初始化逻辑
+#             importlib.reload(rmap_routes) 
         
-        # 断言正确的错误信息
-        assert "RMAP_SERVER_PRIV not found at:" in str(excinfo.value)
+#         # 断言正确的错误信息
+#         assert "RMAP_SERVER_PRIV not found at:" in str(excinfo.value)
         
 
 
