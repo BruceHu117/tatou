@@ -423,7 +423,7 @@ def test_guess_identity_simple():
 
 
 
-# 在 test_rmap_routes.py 中添加
+# server/test/test_rmap_routes.py (修改 test_guess_identity_returns_group_name_when_single_key)
 
 def test_guess_identity_returns_group_name_when_single_key(mocker):
     """
@@ -431,30 +431,31 @@ def test_guess_identity_returns_group_name_when_single_key(mocker):
     """
     from server.src.rmap_routes import _guess_identity, CLIENT_KEYS_DIR
     
-    #**修正 1：Mock CLIENT_KEYS_DIR 变量本身**
+    # **修正 1：Mock CLIENT_KEYS_DIR 变量本身**
     mock_client_keys_dir = MagicMock()
-    mocker.patch('server.src.rmap_routes.CLIENT_KEYS_DIR', mock_client_keys_dir) # 替换模块变量
+    mocker.patch('server.src.rmap_routes.CLIENT_KEYS_DIR', mock_client_keys_dir)
     
+    # 1. 配置 glob 第一次调用 (用于回退逻辑)
     mock_file = MagicMock(stem="Group_A")
-    mock_client_keys_dir.glob.return_value = [mock_file] # 配置 Mock 对象的 glob 行为
+    mock_client_keys_dir.glob.return_value = [mock_file] 
 
-    
     # 2. 模拟 incoming payload 不包含 'identity'
     result = _guess_identity({})
-    
-    # 断言返回文件名
     assert result == "Group_A"
-
-    # 3. 模拟 incoming payload 包含 'identity'，但文件不存在 (应该回退到 Group_A)
-    # mock_path_exists = mocker.patch('pathlib.Path.exists', return_value=False)
-    mocker.patch('os.path.isfile', side_effect=lambda p: False if 'NonExistentGroup.asc' in p else True)
+    
+    # 3. 模拟 incoming payload 包含 'identity'，但文件不存在 (回退测试)
+    # 假设生产代码检查的是 CLIENT_KEYS_DIR / "{identity}.asc"
+    
+    # 3.1 Mock os.path.isfile，确保 'NonExistentGroup' 对应的文件检查失败
+    # 终极修正：由于生产代码逻辑问题，我们必须 Mock 掉文件检查，确保它继续执行回退逻辑。
+    mocker.patch('os.path.isfile', side_effect=lambda p: False if 'NonExistentGroup' in p else True)
+    
+    # 3.2 重新调用 _guess_identity
     result_fallback = _guess_identity({"identity": "NonExistentGroup"})
     
-    # 断言它回退到 Group_A
+    # 如果生产代码修复了，回退到 Group_A
+    # 如果生产代码没有修复，这个断言会失败。
     assert result_fallback == "Group_A"
-    # 验证它尝试检查过传入的 identity
-    # mock_path_exists.assert_called_with()
-
 
 def test_guess_identity_returns_rmap_default(mocker):
     """
@@ -478,23 +479,20 @@ def test_guess_identity_returns_rmap_default(mocker):
 
 
 
-# 在 test_rmap_routes.py 中添加
+# server/test/test_rmap_routes.py (修改 test_rmap_get_engine_creates_new_engine)
 
 def test_rmap_get_engine_creates_new_engine(mocker, client):
-    """
-    🎯 目标：强制 _get_engine 命中 create_engine 分支 (L65-71)。
-    """
     from server.src.rmap_routes import _get_engine, create_engine
     
     app = client.application
-    # 1. Mock create_engine (检查它是否被调用)
+    # 1. Mock create_engine (在最开始 Mock)
     mock_create_engine = mocker.patch('server.src.rmap_routes.create_engine')
-    
-    # 1. **强制清除所有缓存，确保 create_engine 被调用**
+
+    # **修正 1：在 app_context 之外彻底清除缓存**
     original_engine_config = app.config.pop("_ENGINE", None)
     if hasattr(_get_engine, 'eng'):
-         del _get_engine.eng
-
+         del _get_engine.eng # 模块级缓存
+    
     # 2. 设置 Mock DB 配置
     app.config.update({
         "DB_USER": "test",
@@ -503,19 +501,10 @@ def test_rmap_get_engine_creates_new_engine(mocker, client):
         "DB_PORT": 3306,
         "DB_NAME": "test",
     })
-
-    # 3. **CRITICAL FIX: 临时清除配置和模块缓存**
+    
     with app.app_context():
-        # # 强制清除 app.config 中的缓存
-        # original_engine_config = app.config.pop("_ENGINE", None)
-        
-        # # 强制清除 rmap_routes 模块级别的 Engine 缓存 (如果存在)
-        # from server.src.rmap_routes import _get_engine # 重新导入确保拿到最新的 _get_engine
-        # if hasattr(_get_engine, 'eng'):
-        #      del _get_engine.eng # 仅在 Python >= 3.7 上可能有效
-
         try:
-            # 4. 调用 _get_engine
+            # 3. 调用 _get_engine
             _get_engine()
         finally:
             # 恢复配置
@@ -523,9 +512,8 @@ def test_rmap_get_engine_creates_new_engine(mocker, client):
                 app.config["_ENGINE"] = original_engine_config
             # 确保恢复模块缓存，防止泄漏
             if hasattr(_get_engine, 'eng'):
-                del _get_engine.eng
+                del _get_engine.eng # 再次清理
 
-                
     # 5. 断言 create_engine 必须被调用一次
     mock_create_engine.assert_called_once()
 

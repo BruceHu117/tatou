@@ -488,6 +488,7 @@ def test_create_watermark_file_write_failure(client, mocker, logged_in_client):
     测试 create-watermark 路由在写入水印 PDF 到磁盘失败时返回 500。
     🎯 目标覆盖：server.py L578-580
     """
+    from server.src import watermarking_utils as WMUtils # <-- 确保这一行在顶部或这里
     
     headers = logged_in_client
     docid = 1 # 假设文档 ID 为 1
@@ -510,9 +511,9 @@ def test_create_watermark_file_write_failure(client, mocker, logged_in_client):
     # 2. Mock 水印生成成功 (跳过水印失败检查)
     mocker.patch('pathlib.Path.exists', return_value=True) 
     mocker.patch('pathlib.Path.read_bytes', return_value=b'%PDF-1.4 test')
-    # mocker.patch.object(WMUtils, 'apply_watermark', return_value=b'watermarked_bytes')
-    # mocker.patch.object(WMUtils, 'is_watermarking_applicable', return_value=True)
-
+    mocker.patch.object(WMUtils, 'apply_watermark', return_value=b'watermarked_bytes')
+    mocker.patch.object(WMUtils, 'is_watermarking_applicable', return_value=True)
+    mocker.patch.object(WMUtils, 'get_method', return_value=MagicMock(name="test_method")) # <-- 必须取消注释
     mocker.patch('server.src.server.get_engine', return_value=mock_engine)
 
     # 3. **关键 Mock：模拟文件写入失败，抛出 OSError**
