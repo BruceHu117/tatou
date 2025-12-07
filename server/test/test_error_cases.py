@@ -73,7 +73,17 @@ def logged_in_client(client, mocker):
     
     # 覆盖 server.py 里的 get_engine，使其返回 Mock Engine
     # 路径 'src.server.get_engine' 假设 get_engine 已被提升
-    mocker.patch('src.server.get_engine', return_value=mock_engine)
+
+
+
+
+
+    # mocker.patch('src.server.get_engine', return_value=mock_engine)
+
+
+
+
+
 
     # ----------------------------------------------------
     # 3. 执行注册和登录
@@ -520,3 +530,23 @@ def test_create_watermark_db_insert_error(client, mocker, logged_in_client):
 
 
 
+
+
+
+
+
+
+
+# ----------------------------------------------------
+# 新增：强制清理 Mocking
+# ----------------------------------------------------
+
+# 确保在 conftest.py 中已经有 mocker fixture。
+# 这个 fixture 将在每个测试函数运行后被调用
+@pytest.fixture(autouse=True)
+def cleanup_mocker_session(mocker):
+    """
+    强制在每个测试运行后停止所有 Mocking，防止泄漏到下一个测试。
+    """
+    yield
+    mocker.stopall()
