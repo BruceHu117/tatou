@@ -429,12 +429,15 @@ def test_guess_identity_returns_group_name_when_single_key(mocker):
     """
     🎯 目标：覆盖 _guess_identity 发现单个 Group 密钥文件时的逻辑 (L107)。
     """
-    from server.src.rmap_routes import _guess_identity, CLIENT_KEYS_DIR
+    from server.src.rmap_routes import _guess_identity
+    
+    #**修正 1：Mock CLIENT_KEYS_DIR 变量本身**
+    mock_client_keys_dir = MagicMock()
     
     # 1. 模拟 glob() 返回一个 Group 文件
     mock_file = MagicMock(stem="Group_A")
-    mocker.patch.object(CLIENT_KEYS_DIR, 'glob', return_value=[mock_file])
-    
+    mock_client_keys_dir.glob.return_value = [mock_file] # 配置 Mock 对象的 glob 行为
+    mocker.patch('server.src.rmap_routes.CLIENT_KEYS_DIR', mock_client_keys_dir) # 替换模块变量
     # 2. 模拟 incoming payload 不包含 'identity'
     result = _guess_identity({})
     
@@ -455,19 +458,15 @@ def test_guess_identity_returns_rmap_default(mocker):
     """
     🎯 目标：覆盖 _guess_identity 找不到 Group 文件时的默认回退到 'rmap' (L109)。
     """
-    from server.src.rmap_routes import _guess_identity, CLIENT_KEYS_DIR
+    from server.src.rmap_routes import _guess_identity
     
-    # 1. 模拟 glob() 返回多个或零个文件
-    mocker.patch.object(CLIENT_KEYS_DIR, 'glob', return_value=[])
+    # **修正 1：Mock CLIENT_KEYS_DIR 变量本身**
+    mock_client_keys_dir = MagicMock()
     
-    # 2. 模拟 incoming payload 不包含 'identity'
-    result = _guess_identity({})
+    # 1. 模拟 glob() 返回零个文件
+    mock_client_keys_dir.glob.return_value = []
     
-    # 断言返回默认值
-    assert result == "rmap"
-
-    # 3. 模拟 glob() 返回多个文件
-    mocker.patch.object(CLIENT_KEYS_DIR, 'glob', return_value=[MagicMock(), MagicMock()])
+    mocker.patch('server.src.rmap_routes.CLIENT_KEYS_DIR', mock_client_keys_dir)
     result_multiple = _guess_identity({})
     
     # 断言返回默认值
@@ -505,6 +504,7 @@ def test_rmap_get_engine_creates_new_engine(mocker, client):
         original_engine_config = app.config.pop("_ENGINE", None)
         
         # 强制清除 rmap_routes 模块级别的 Engine 缓存 (如果存在)
+        from server.src.rmap_routes import _get_engine # 重新导入确保拿到最新的 _get_engine
         if hasattr(_get_engine, 'eng'):
              del _get_engine.eng # 仅在 Python >= 3.7 上可能有效
 

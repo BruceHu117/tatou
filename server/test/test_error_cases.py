@@ -492,24 +492,31 @@ def test_create_watermark_file_write_failure(client, mocker, logged_in_client):
     headers = logged_in_client
     docid = 1 # 假设文档 ID 为 1
 
-    # 1. Mock DB 成功返回文档 (跳过 404/410 检查)
+    # # 1. Mock DB 成功返回文档 (跳过 404/410 检查)
     mock_doc_row = MagicMock(id=docid, name="test.pdf", path="/mock/path/doc.pdf")
-    mocker.patch('server.src.server.get_engine.return_value.connect.return_value.__enter__.return_value.execute.return_value.first', 
-                 return_value=mock_doc_row)
+    # mocker.patch('server.src.server.get_engine.return_value.connect.return_value.__enter__.return_value.execute.return_value.first', 
+    #              return_value=mock_doc_row)
     
+# 1. 创建 Mock Engine，并配置其行为
+    mock_engine = MagicMock()
+    mock_conn = mock_engine.connect.return_value.__enter__.return_value
+    mock_conn.execute.return_value.first.return_value = mock_doc_row # <-- 修正后的配置
+
     # 2. Mock 水印生成成功 (跳过水印失败检查)
-    mocker.patch('pathlib.Path.exists', return_value=True) 
-    mocker.patch('pathlib.Path.read_bytes', return_value=b'%PDF-1.4 test')
-    mocker.patch.object(WMUtils, 'apply_watermark', return_value=b'watermarked_bytes')
-    mocker.patch.object(WMUtils, 'is_watermarking_applicable', return_value=True)
-    mocker.patch.object(WMUtils, 'get_method', return_value=MagicMock(name="test_method"))
-    
+    # mocker.patch('pathlib.Path.exists', return_value=True) 
+    # mocker.patch('pathlib.Path.read_bytes', return_value=b'%PDF-1.4 test')
+    # mocker.patch.object(WMUtils, 'apply_watermark', return_value=b'watermarked_bytes')
+    # mocker.patch.object(WMUtils, 'is_watermarking_applicable', return_value=True)
+    # mocker.patch.object(WMUtils, 'get_method', return_value=MagicMock(name="test_method"))
+
+    mocker.patch('server.src.server.get_engine', return_value=mock_engine)
+
     # 3. **关键 Mock：模拟文件写入失败，抛出 OSError**
-    mock_dest_path_open = mocker.patch('pathlib.Path.open', side_effect=OSError("Disk full or permission denied"))
+    mocker.patch('pathlib.Path.open', side_effect=OSError("Disk full or permission denied"))
     
     # 4. Mock 数据库 Version 插入成功（因为我们希望在写入失败后停止）
-    mocker.patch('server.src.server.get_engine.return_value.begin.return_value.__enter__.return_value.execute', return_value=MagicMock(lastrowid=1))
-
+    # mocker.patch('server.src.server.get_engine.return_value.begin.return_value.__enter__.return_value.execute', return_value=MagicMock(lastrowid=1))
+    mock_engine.begin.return_value.__enter__.return_value.execute.return_value.lastrowid = 1
 
     # 5. 运行请求
     r = client.post(

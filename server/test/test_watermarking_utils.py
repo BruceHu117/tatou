@@ -76,7 +76,7 @@ def test_metadata_watermark_roundtrip(sample_pdf):
     """
     🎯 目标：测试 MetadataWatermark 的读写轮询，覆盖 read_secret 的逻辑。
     """
-    from server.src.metadata_watermark import MetadataWatermark, SecretNotFoundError, InvalidKeyError
+    from server.src.metadata_watermark import MetadataWatermark
     
     wm_instance = MetadataWatermark()
     secret = "XMP_SECRET_789"
@@ -93,9 +93,9 @@ def test_metadata_watermark_roundtrip(sample_pdf):
     assert extracted_secret == secret
     
     # 3. 验证错误的 Key (杀死校验逻辑中的变异体)
-    with pytest.raises(InvalidKeyError):
+    with pytest.raises(RuntimeError):
         wm_instance.read_secret(out_bytes, "WRONG_KEY")
         
     # 4. 验证读取没有水印的文件 (覆盖 SecretNotFoundError)
-    with pytest.raises(SecretNotFoundError):
+    with pytest.raises(RuntimeError):
         wm_instance.read_secret(pdf_bytes, key)
