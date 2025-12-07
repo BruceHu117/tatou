@@ -9,7 +9,16 @@ from unittest import mock
 @pytest.fixture
 def sample_pdf(tmp_path):
     pdf = tmp_path / "sample.pdf"
-    pdf.write_bytes(b"%PDF-1.4\n% Test PDF\n%%EOF\n")
+
+    # 修正：使用一个更完整的、能被 fitz 识别的极简 PDF 结构
+    valid_pdf_bytes = (
+        b"%PDF-1.4\n"
+        b"1 0 obj\n<<>>\nendobj\n"
+        b"xref\n0 2\n0000000000 65535 f \n0000000010 00000 n \n"
+        b"trailer\n<<>>\nstartxref\n20\n%%EOF\n" # 确保文件末尾有换行
+    )
+
+    pdf.write_bytes(valid_pdf_bytes)
     return pdf
 
 def test_list_methods_contains_all_methods():
